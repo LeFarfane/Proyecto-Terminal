@@ -178,6 +178,9 @@ class Article:
     Pages: str
     DOI: str
     citation_apa: str
+    PubMedURL: str
+    PublicationTypes: List[str]
+    QueryTerms: List[str]
 
 
 def download_articles(
@@ -187,6 +190,7 @@ def download_articles(
     output_jsonl,
     article_types,
     languages,
+    query_terms,
     batch_size=100,
 ):
     """Fetch article details for each PMID and write them to CSV and JSONL."""
@@ -230,10 +234,11 @@ def download_articles(
                     if languages and not any(l in languages for l in langs):
                         continue
 
-                    pub_types = [
-                        normalize_text(pt.text).lower()
+                    pub_types_raw = [
+                        normalize_text(pt.text)
                         for pt in root.findall(".//PublicationTypeList/PublicationType")
                     ]
+                    pub_types = [pt.lower() for pt in pub_types_raw]
                     # Filtra por tipos de publicación seleccionados
                     if article_types and not any(pt in article_types for pt in pub_types):
                         continue
@@ -280,6 +285,8 @@ def download_articles(
                     )
                     pmid = normalize_text(root.findtext(".//PMID", default=""))
 
+                    pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+
                     citation = build_apa_citation(
                         format_authors_apa(authors_list),
                         year,
@@ -303,10 +310,16 @@ def download_articles(
                         Pages=pages,
                         DOI=doi,
                         citation_apa=citation,
+                        PubMedURL=pubmed_url,
+                        PublicationTypes=pub_types_raw,
+                        QueryTerms=query_terms,
                     )
                     # Guarda el artículo en los formatos solicitados
                     if csv_writer:
-                        csv_writer.writerow(asdict(article))
+                        row = asdict(article)
+                        row["PublicationTypes"] = "; ".join(row["PublicationTypes"])
+                        row["QueryTerms"] = "; ".join(row["QueryTerms"])
+                        csv_writer.writerow(row)
                     if jsonlfile:
                         json.dump(asdict(article), jsonlfile, ensure_ascii=False)
                         jsonlfile.write("\n")
@@ -390,6 +403,7 @@ def run_query(
         output_jsonl,
         article_types,
         languages,
+        terms,
         batch_size,
     )
     write_readme(query, count, __version__)
