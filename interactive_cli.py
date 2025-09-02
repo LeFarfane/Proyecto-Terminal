@@ -221,7 +221,7 @@ def prompt_systematic_sb() -> bool:
 
 def main():
     """Flujo principal para recolectar parámetros y ejecutar la búsqueda."""
-    terms = prompt_list(
+    query_terms = prompt_list(
         "Search terms (semicolon-separated)",
         "microRNA; celiac disease; inflammatory bowel disease",
         ";",
@@ -289,7 +289,7 @@ def main():
 
     # Resumen de parámetros elegido por el usuario
     summary = {
-        "terms": terms,
+        "query_terms": query_terms,
         "operator": operator,
         "sort": sort,
         "pub_types": pub_types,
@@ -304,7 +304,7 @@ def main():
     }
     print(json.dumps(summary, indent=2))
     # Construcción del query final
-    terms_query = " {} ".format(operator).join([f"(\"{t}\")" for t in terms])
+    terms_query = " {} ".format(operator).join([f"(\"{t}\")" for t in query_terms])
     if pub_types_pubmed:
         final_query = f"{terms_query} AND ({' OR '.join(pub_types_pubmed)})"
     else:
@@ -320,7 +320,7 @@ def main():
     spec.loader.exec_module(pubmed_api)
     run_signature = inspect.signature(pubmed_api.run_query)
     run_kwargs = {
-        "terms": terms,
+        "terms": query_terms,
         "operator": operator,
         "sort": sort,
         "pub_types": pub_types,
