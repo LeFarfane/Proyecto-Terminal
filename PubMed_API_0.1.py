@@ -1,20 +1,60 @@
-import requests
-import csv
-import time
 import argparse
-import xml.etree.ElementTree as ET
+import csv
+import json
+import logging
 import os
+import re
+import time
+import unicodedata
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 import email.utils
+import requests
 
 search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 headers = {"User-Agent": "Proyecto-Terminal (eduardo_bio12@outlook.com)"}
 
+TOOL = "Proyecto-Terminal"
+EMAIL = "eduardo_bio12@outlook.com"
+
+__version__ = "0.2"
+
+logger = logging.getLogger(__name__)
+
+session = requests.Session()
+session.headers.update(headers)
+
 api_key = os.getenv("NCBI_API_KEY", "")
 
 
-def requests_get_with_retries(url, params=None, headers=None, max_retries=5, backoff_factor=1):
+def setup_logging(log_file: str) -> None:
+    """Configure logging to console and a file."""
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
+
+    fh = logging.FileHandler(log_file)
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+
+def normalize_text(text: str) -> str:
+    """Normalize unicode text and collapse internal whitespace."""
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFKC", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def requests_get_with_retries(
+    url, params=None, headers=None, max_retries=5, backoff_factor=1, timeout=10
+):
     """Make GET requests with retries on network errors or 429/5xx responses.
 
     Respects ``Retry-After`` headers when provided by the server to comply with
@@ -22,7 +62,7 @@ def requests_get_with_retries(url, params=None, headers=None, max_retries=5, bac
     """
     for attempt in range(max_retries):
         try:
-            response = requests.get(url, params=params, headers=headers)
+            response = session.get(url, params=params, headers=headers, timeout=timeout)
             # Retry on 429 or server errors
             if response.status_code == 429 or response.status_code >= 500:
                 retry_after = response.headers.get("Retry-After")
@@ -50,7 +90,7 @@ def requests_get_with_retries(url, params=None, headers=None, max_retries=5, bac
 
 
 def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000"):
-    """Return a list of PMIDs for the search term."""
+    """Return a deduplicated list of PMIDs for the search term."""
     pmids = []
     try:
         search_params = {
@@ -61,6 +101,8 @@ def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000"):
             "datetype": "pdat",
             "mindate": mindate,
             "maxdate": maxdate,
+            "tool": TOOL,
+            "email": EMAIL,
         }
         if api_key:
             search_params["api_key"] = api_key
@@ -69,17 +111,97 @@ def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000"):
         )
         search_response.raise_for_status()
         pmids = search_response.json().get("esearchresult", {}).get("idlist", [])
+        pmids = list(dict.fromkeys(pmids))
     except Exception as e:
-        print(f"Error searching term '{term}': {e}")
+        logger.error("Error searching term '%s': %s", term, e)
     return pmids
 
 
-def download_articles(pmids, api_key, output_path):
-    """Fetch article details for each PMID and write them to a CSV file."""
+def format_authors_apa(authors_list):
+    formatted = []
+    for last, initials in authors_list:
+        if not last:
+            continue
+        initials_formatted = ". ".join(list(initials)) + "." if initials else ""
+        formatted.append(f"{last}, {initials_formatted}".strip())
+    if len(formatted) > 21:
+        formatted = formatted[:19] + ["..."] + [formatted[-1]]
+    if len(formatted) > 1:
+        return ", ".join(formatted[:-1]) + ", & " + formatted[-1]
+    return formatted[0] if formatted else ""
+
+
+def build_apa_citation(authors, year, title, journal, volume, issue, pages, doi):
+    citation = f"{authors} ({year}). {title}. {journal}"
+    if volume:
+        citation += f", {volume}"
+    if issue:
+        citation += f"({issue})"
+    if pages:
+        citation += f", {pages}"
+    if doi:
+        citation += f". https://doi.org/{doi}"
+    else:
+        citation += "."
+    return citation
+
+
+def write_readme(term: str, count: int, version: str) -> None:
+    date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+    content = f"""# Proyecto-Terminal
+
+## Última búsqueda
+- Término: {term}
+- Artículos guardados: {count}
+
+Generado el {date} con versión {version}.
+
+## Environment Variables
+
+Set the `NCBI_API_KEY` environment variable to use an NCBI API key for PubMed requests:
+
+```bash
+export NCBI_API_KEY=\"your_api_key_here\"
+```
+
+This increases the request rate limits when running `PubMed_API_0.1.py`.
+"""
+    with open("README.md", "w", encoding="utf-8") as f:
+        f.write(content)
+
+
+def download_articles(
+    pmids,
+    api_key,
+    output_csv,
+    output_jsonl,
+    article_types,
+    languages,
+):
+    """Fetch article details for each PMID and write them to CSV and JSONL."""
     batch_size = 100  # NCBI recommends batching 50-100 IDs per request
-    with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+    saved = 0
+    csv_exists = os.path.isfile(output_csv)
+    with open(output_csv, "a", newline="", encoding="utf-8") as csvfile, open(
+        output_jsonl, "a", encoding="utf-8"
+    ) as jsonlfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["PMID", "Title", "Abstract", "Authors", "Year", "Journal"])
+        if not csv_exists:
+            writer.writerow(
+                [
+                    "PMID",
+                    "Title",
+                    "Abstract",
+                    "Authors",
+                    "Year",
+                    "Journal",
+                    "Volume",
+                    "Issue",
+                    "Pages",
+                    "DOI",
+                    "citation_apa",
+                ]
+            )
 
         for i in range(0, len(pmids), batch_size):
             batch = pmids[i : i + batch_size]
@@ -87,6 +209,8 @@ def download_articles(pmids, api_key, output_path):
                 "db": "pubmed",
                 "id": ",".join(batch),
                 "retmode": "xml",
+                "tool": TOOL,
+                "email": EMAIL,
             }
             if api_key:
                 params["api_key"] = api_key
@@ -98,41 +222,115 @@ def download_articles(pmids, api_key, output_path):
                 batch_root = ET.fromstring(response.text)
                 for article in batch_root.findall("PubmedArticle"):
                     root = article
+
+                    langs = [normalize_text(l.text).lower() for l in root.findall(".//Language")]
+                    if languages and not any(l in languages for l in langs):
+                        continue
+
+                    pub_types = [
+                        normalize_text(pt.text).lower()
+                        for pt in root.findall(".//PublicationTypeList/PublicationType")
+                    ]
+                    if article_types and not any(pt in article_types for pt in pub_types):
+                        continue
+
                     title_elem = root.find(".//ArticleTitle")
                     title = (
-                        "".join(title_elem.itertext()).strip()
+                        normalize_text("".join(title_elem.itertext()))
                         if title_elem is not None
                         else ""
                     )
 
                     abstract_parts = []
                     for node in root.findall(".//Abstract/AbstractText"):
-                        text = "".join(node.itertext()).strip()
-                        label = node.get("Label")
-                        if label:
-                            abstract_parts.append(f"{label}: {text}")
-                        else:
-                            abstract_parts.append(text)
-                    abstract = " ".join(abstract_parts)
+                        text = normalize_text("".join(node.itertext()))
+                        label = node.get("Label") or node.get("NlmCategory")
+                        abstract_parts.append(f"{label}: {text}" if label else text)
+                    abstract = "\n".join(abstract_parts)
 
+                    authors_elems = root.findall(".//AuthorList/Author")
+                    authors_list = []
+                    for author in authors_elems:
+                        last = normalize_text(author.findtext("LastName", ""))
+                        initials = normalize_text(author.findtext("Initials", ""))
+                        if last or initials:
+                            authors_list.append((last, initials))
                     authors = "; ".join(
-                        [
-                            f"{author.findtext('LastName', '')} {author.findtext('Initials', '')}".strip()
-                            for author in root.findall(".//AuthorList/Author")
-                            if author.findtext("LastName") or author.findtext("Initials")
-                        ]
+                        [f"{last} {initials}".strip() for last, initials in authors_list]
                     )
-                    year = root.findtext(".//PubDate/Year", default="")
-                    journal = root.findtext(".//Journal/Title", default="")
-                    pmid = root.findtext(".//PMID", default="")
-                    writer.writerow([pmid, title, abstract, authors, year, journal])
+
+                    year = normalize_text(root.findtext(".//PubDate/Year", default=""))
+                    journal = normalize_text(root.findtext(".//Journal/Title", default=""))
+                    volume = normalize_text(
+                        root.findtext(".//JournalIssue/Volume", default="")
+                    )
+                    issue = normalize_text(
+                        root.findtext(".//JournalIssue/Issue", default="")
+                    )
+                    pages = normalize_text(root.findtext(".//MedlinePgn", default=""))
+                    doi = normalize_text(
+                        root.findtext(
+                            ".//ArticleIdList/ArticleId[@IdType='doi']",
+                            default="",
+                        )
+                    )
+                    pmid = normalize_text(root.findtext(".//PMID", default=""))
+
+                    citation = build_apa_citation(
+                        format_authors_apa(authors_list),
+                        year,
+                        title,
+                        journal,
+                        volume,
+                        issue,
+                        pages,
+                        doi,
+                    )
+
+                    row = [
+                        pmid,
+                        title,
+                        abstract,
+                        authors,
+                        year,
+                        journal,
+                        volume,
+                        issue,
+                        pages,
+                        doi,
+                        citation,
+                    ]
+                    writer.writerow(row)
+                    jsonlfile.write(
+                        json.dumps(
+                            {
+                                "PMID": pmid,
+                                "Title": title,
+                                "Abstract": abstract,
+                                "Authors": authors,
+                                "Year": year,
+                                "Journal": journal,
+                                "Volume": volume,
+                                "Issue": issue,
+                                "Pages": pages,
+                                "DOI": doi,
+                                "citation_apa": citation,
+                            },
+                            ensure_ascii=False,
+                        )
+                        + "\n"
+                    )
+                    saved += 1
             except Exception as e:
-                print(f"Error retrieving PMIDs {batch}: {e}")
+                logger.error("Error retrieving PMIDs %s: %s", batch, e)
             time.sleep(0.1)
+    return saved
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Download PubMed papers to CSV")
+    parser = argparse.ArgumentParser(
+        description="Download PubMed papers to CSV and JSONL"
+    )
     parser.add_argument(
         "--search_term", default="microRNA", help="Term to search for in PubMed"
     )
@@ -148,12 +346,52 @@ def main():
     parser.add_argument(
         "--maxdate", default="3000", help="Maximum publication year"
     )
+    parser.add_argument(
+        "--article_types",
+        default="Journal Article",
+        help="Comma-separated publication types to include",
+    )
+    parser.add_argument(
+        "--languages",
+        default="eng,spa",
+        help="Comma-separated language codes to include",
+    )
+    parser.add_argument(
+        "--output_csv", default="papers.csv", help="CSV output file"
+    )
+    parser.add_argument(
+        "--output_jsonl", default="papers.jsonl", help="JSONL output file"
+    )
+    parser.add_argument(
+        "--log_file", default="PubMed_API_0.1.log", help="Log file path"
+    )
     args = parser.parse_args()
+
+    setup_logging(args.log_file)
+    logger.info("Script version: %s", __version__)
+    logger.info(
+        "Run date: %s", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+    )
+    logger.info("Parameters: %s", vars(args))
 
     pmids = search_pmids(
         args.search_term, args.max_results, api_key, args.mindate, args.maxdate
     )
-    download_articles(pmids, api_key, "papers.csv")
+    article_types = [
+        normalize_text(t).lower() for t in args.article_types.split(",") if t
+    ]
+    languages = [normalize_text(l).lower() for l in args.languages.split(",") if l]
+
+    count = download_articles(
+        pmids,
+        api_key,
+        args.output_csv,
+        args.output_jsonl,
+        article_types,
+        languages,
+    )
+    write_readme(args.search_term, count, __version__)
+    logger.info("Saved %d articles", count)
 
 
 if __name__ == "__main__":
