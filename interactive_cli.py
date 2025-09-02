@@ -2,6 +2,7 @@
 """Interactive assistant for PubMed search parameter collection."""
 import os
 import json
+import importlib.util
 
 def prompt_list(message: str, default: str, sep: str) -> list:
     while True:
@@ -120,6 +121,24 @@ def main():
         "append": append,
     }
     print(json.dumps(summary, indent=2))
+
+    # Invoke the PubMed query script with the collected parameters
+    spec = importlib.util.spec_from_file_location(
+        "PubMed_API_0_1", "PubMed_API_0.1.py"
+    )
+    pubmed_api = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(pubmed_api)
+    pubmed_api.main(
+        terms=terms,
+        operator=operator,
+        sort=sort,
+        pub_types=pub_types,
+        batch_size=batch_size,
+        max_results=max_results,
+        api_key=api_key,
+        format=output_format,
+        append=append,
+    )
 
 if __name__ == "__main__":
     main()
