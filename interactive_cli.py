@@ -128,7 +128,7 @@ def main():
     )
     pubmed_api = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(pubmed_api)
-    pubmed_api.main(
+    pubmed_api.run_query(
         terms=terms,
         operator=operator,
         sort=sort,
