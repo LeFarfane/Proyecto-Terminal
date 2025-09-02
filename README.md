@@ -1,10 +1,10 @@
 # Proyecto-Terminal
 
 ## Última búsqueda
-- Término: microRNA
-- Artículos guardados: 4
+- Término: AIDS
+- Artículos guardados: 200
 
-Generado el 2025-09-02 11:16:52 UTC con versión 0.2.
+Generado el 2025-09-02 12:02:23 UTC con versión 0.2.
 
 ## Environment Variables
 
