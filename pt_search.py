@@ -46,6 +46,14 @@ def load_corpus(jsonl_path: str = "papers.jsonl", csv_path: str = "papers.csv") 
     df["DOI"] = df.get("DOI", "").fillna("").apply(normalize_text)
     df["citation_apa"] = df.get("citation_apa", "").fillna("")
     df["Abstract_len"] = df["Abstract"].apply(len)
+    if "PublicationTypes" in df.columns:
+        df["PublicationTypes_norm"] = df["PublicationTypes"].apply(
+            lambda x: x
+            if isinstance(x, list)
+            else [t.strip() for t in str(x).split(";") if t.strip()] if isinstance(x, str) and x else []
+        )
+    else:
+        df["PublicationTypes_norm"] = [[] for _ in range(len(df))]
     return df
 
 
@@ -208,8 +216,17 @@ class SearchEngine:
                 score += rec
                 if rec:
                     expl.append(f"recency+{rec:.2f}")
-            pub_type = row.get("PublicationType") or row.get("Publication Types")
-            if isinstance(pub_type, str) and re.search(r"review|meta-analysis", pub_type, re.I):
+            pub_types = (
+                row.get("PublicationTypes_norm")
+                or row.get("PublicationTypes")
+                or row.get("PublicationType")
+                or row.get("Publication Types")
+            )
+            if isinstance(pub_types, str):
+                pub_types = [t.strip() for t in re.split(r";|,", pub_types) if t.strip()]
+            if isinstance(pub_types, list) and any(
+                re.search(r"review|meta-analysis", pt, re.I) for pt in pub_types
+            ):
                 score += 0.2
                 expl.append("review")
             dom = self._domain_boost(row["Abstract"])
