@@ -352,7 +352,7 @@ def run_query(
     format: str,
     append: bool,
 ):
-    search_term = f" {operator} ".join(terms)
+    query = f" {operator} ".join(terms)
     setup_logging("PubMed_API_0.1.log")
     logger.info("Script version: %s", __version__)
     logger.info(
@@ -373,7 +373,7 @@ def run_query(
         },
     )
 
-    pmids = search_pmids(search_term, max_results, api_key, sort=sort)
+    pmids = search_pmids(query, max_results, api_key, sort=sort)
     article_types = [normalize_text(t).lower() for t in pub_types]
     languages = []
 
@@ -395,7 +395,7 @@ def run_query(
         languages,
         batch_size,
     )
-    write_readme(search_term, count, __version__)
+    write_readme(query, count, __version__)
     logger.info("Saved %d articles", count)
     return count
 
