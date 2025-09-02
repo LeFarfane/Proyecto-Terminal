@@ -3,8 +3,27 @@ import csv
 import time
 import xml.etree.ElementTree as ET
 
-# lista de PubMed artículos
-pmids = ["16957370", "25471818", "34370220", "27807838", "21342132"]
+# término de búsqueda para PubMed
+search_term = "microRNA"
+
+search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+headers = {"User-Agent": "Proyecto-Terminal (eduardo_bio12@outlook.com)"}
+
+# obtener PMIDs a partir del término de búsqueda
+pmids = []
+try:
+    search_params = {
+        "db": "pubmed",
+        "term": search_term,
+        "retmode": "json",
+        "retmax": 5,
+    }
+    search_response = requests.get(search_url, params=search_params, headers=headers)
+    search_response.raise_for_status()
+    pmids = search_response.json().get("esearchresult", {}).get("idlist", [])
+except Exception as e:
+    print(f"Error searching term '{search_term}': {e}")
 
 # creación del documento:
 with open("papers.csv", "w", newline='', encoding="utf-8") as csvfile:
@@ -12,16 +31,13 @@ with open("papers.csv", "w", newline='', encoding="utf-8") as csvfile:
     writer.writerow(["PMID", "Title", "Abstract"])
 
     for pmid in pmids:
-        url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=123456&api_key=13e95361a48723d44b36435dfde486596108"
         params = {
             "db": "pubmed",
             "id": pmid,
             "retmode": "xml",
         }
         try:
-            response = requests.get(url, params=params, headers={
-                "User-Agent": "Proyecto-Terminal (eduardo_bio12@outlook.com)"
-            })
+            response = requests.get(fetch_url, params=params, headers=headers)
             response.raise_for_status()
             root = ET.fromstring(response.text)
             title = root.findtext(".//ArticleTitle", default="")
