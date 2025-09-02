@@ -12,7 +12,7 @@ with open("papers.csv", "w", newline='', encoding="utf-8") as csvfile:
     writer.writerow(["PMID", "Title", "Abstract"])
 
     for pmid in pmids:
-        url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+        url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=123456&api_key=13e95361a48723d44b36435dfde486596108"
         params = {
             "db": "pubmed",
             "id": pmid,
@@ -20,7 +20,7 @@ with open("papers.csv", "w", newline='', encoding="utf-8") as csvfile:
         }
         try:
             response = requests.get(url, params=params, headers={
-                "User-Agent": "Proyecto-Terminal (your_email@example.com)"
+                "User-Agent": "Proyecto-Terminal (eduardo_bio12@outlook.com)"
             })
             response.raise_for_status()
             root = ET.fromstring(response.text)
@@ -29,4 +29,4 @@ with open("papers.csv", "w", newline='', encoding="utf-8") as csvfile:
             writer.writerow([pmid, title, abstract])
         except Exception as e:
             print(f"Error retrieving PMID {pmid}: {e}")
-        time.sleep(0.34)
+        time.sleep(0.1)
