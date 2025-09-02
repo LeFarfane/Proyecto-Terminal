@@ -1,10 +1,10 @@
 # Proyecto-Terminal
 
 ## Última búsqueda
-- Término: (microARN)
-- Artículos guardados: 33
+- Término: ("IBS") AND (Systematic Review[Publication Type])
+- Artículos guardados: 200
 
-Generado el 2025-09-02 12:43:10 UTC con versión 0.2.
+Generado el 2025-09-02 13:58:18 UTC con versión 0.2.
 
 ## Environment Variables
 
