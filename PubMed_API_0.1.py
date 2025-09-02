@@ -15,17 +15,21 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+# URLs base de la API de PubMed y encabezado de identificación
 search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 headers = {"User-Agent": "Proyecto-Terminal (eduardo_bio12@outlook.com)"}
 
+# Identificadores requeridos por NCBI
 TOOL = "Proyecto-Terminal"
 EMAIL = "eduardo_bio12@outlook.com"
 
 __version__ = "0.2"
 
+# Logger principal del módulo
 logger = logging.getLogger(__name__)
 
+# Sesión HTTP con estrategia de reintentos
 session = requests.Session()
 session.headers.update(headers)
 retry_strategy = Retry(
@@ -38,11 +42,13 @@ adapter = HTTPAdapter(max_retries=retry_strategy)
 session.mount("https://", adapter)
 session.mount("http://", adapter)
 
+# API key opcional para aumentar el límite de peticiones
 api_key = os.getenv("NCBI_API_KEY", "")
 
 
 def setup_logging(log_file: str) -> None:
     """Configure logging to console and a file."""
+    # Prepara el logger para consola y archivo
     logger.setLevel(logging.INFO)
     if logger.handlers:
         logger.handlers.clear()
@@ -61,6 +67,7 @@ def setup_logging(log_file: str) -> None:
 
 def normalize_text(text: str) -> str:
     """Normalize unicode text and collapse internal whitespace."""
+    # Normaliza texto Unicode y elimina espacios extra
     if not text:
         return ""
     text = unicodedata.normalize("NFKC", text)
@@ -69,11 +76,13 @@ def normalize_text(text: str) -> str:
 
 def sanitize_term(term: str) -> str:
     """Escape special characters in PubMed search terms."""
+    # Escapa comillas para la consulta
     term = term.replace('"', '\"')
     return f'"{term}"'
 
 def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000", sort="relevance"):
     """Return a deduplicated list of PMIDs for the search term."""
+    # Realiza la búsqueda de PMIDs en PubMed
     pmids = []
     try:
         search_params = {
@@ -100,6 +109,7 @@ def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000", sor
 
 
 def format_authors_apa(authors_list):
+    """Convierte lista de autores al formato APA."""
     formatted = []
     for last, initials in authors_list:
         if not last:
@@ -114,6 +124,7 @@ def format_authors_apa(authors_list):
 
 
 def build_apa_citation(authors, year, title, journal, volume, issue, pages, doi):
+    """Construye la cita en formato APA."""
     citation = f"{authors} ({year}). {title}. {journal}"
     if volume:
         citation += f", {volume}"
@@ -129,6 +140,7 @@ def build_apa_citation(authors, year, title, journal, volume, issue, pages, doi)
 
 
 def write_readme(term: str, count: int, version: str) -> None:
+    # Actualiza el README con detalles de la última búsqueda
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
     content = f"""# Proyecto-Terminal
 
@@ -154,6 +166,7 @@ This increases the request rate limits when running `PubMed_API_0.1.py`.
 
 @dataclass
 class Article:
+    """Modelo de datos para un artículo de PubMed."""
     PMID: str
     Title: str
     Abstract: str
@@ -177,6 +190,7 @@ def download_articles(
     batch_size=100,
 ):
     """Fetch article details for each PMID and write them to CSV and JSONL."""
+    # Descarga artículos en lotes y guarda los resultados
     saved = 0
     csv_writer = None
     csvfile = None
@@ -192,6 +206,7 @@ def download_articles(
         if output_jsonl:
             jsonlfile = open(output_jsonl, "a", encoding="utf-8")
 
+        # Procesa los PMIDs en bloques
         for i in range(0, len(pmids), batch_size):
             batch = pmids[i : i + batch_size]
             params = {
@@ -210,6 +225,7 @@ def download_articles(
                 for article in batch_root.findall("PubmedArticle"):
                     root = article
 
+                    # Filtra por idiomas especificados
                     langs = [normalize_text(l.text).lower() for l in root.findall(".//Language")]
                     if languages and not any(l in languages for l in langs):
                         continue
@@ -218,6 +234,7 @@ def download_articles(
                         normalize_text(pt.text).lower()
                         for pt in root.findall(".//PublicationTypeList/PublicationType")
                     ]
+                    # Filtra por tipos de publicación seleccionados
                     if article_types and not any(pt in article_types for pt in pub_types):
                         continue
 
@@ -287,6 +304,7 @@ def download_articles(
                         DOI=doi,
                         citation_apa=citation,
                     )
+                    # Guarda el artículo en los formatos solicitados
                     if csv_writer:
                         csv_writer.writerow(asdict(article))
                     if jsonlfile:
@@ -297,6 +315,7 @@ def download_articles(
                 logger.error("Error retrieving PMIDs %s: %s", batch, e)
             time.sleep(0.1)
     finally:
+        # Asegura el cierre de los archivos
         if csvfile:
             csvfile.close()
         if jsonlfile:
@@ -317,12 +336,14 @@ def run_query(
     append: bool,
     output_base: str,
 ):
+    """Ejecuta la búsqueda en PubMed y guarda los resultados."""
     sanitized_terms = [sanitize_term(t) for t in terms]
     terms_query = f" {operator} ".join([f"({t})" for t in sanitized_terms])
     if pub_types_pubmed:
         query = f"{terms_query} AND ({' OR '.join(pub_types_pubmed)})"
     else:
         query = terms_query
+    # Configura el logger y registra parámetros
     setup_logging("PubMed_API_0.1.log")
     logger.info("Script version: %s", __version__)
     logger.info(
@@ -345,19 +366,23 @@ def run_query(
         },
     )
 
+    # Obtiene PMIDs y prepara filtros
     pmids = search_pmids(query, max_results, api_key, sort=sort)
     article_types = [normalize_text(t).lower() for t in pub_types]
     languages = []
 
+    # Determina archivos de salida
     output_csv = f"{output_base}.csv" if format in ("csv", "both") else None
     output_jsonl = f"{output_base}.jsonl" if format in ("jsonl", "both") else None
 
+    # Elimina archivos previos si no se va a anexar
     if not append:
         if output_csv and os.path.exists(output_csv):
             os.remove(output_csv)
         if output_jsonl and os.path.exists(output_jsonl):
             os.remove(output_jsonl)
 
+    # Descarga artículos y actualiza el README
     count = download_articles(
         pmids,
         api_key,
@@ -373,10 +398,12 @@ def run_query(
 
 
 def main(**kwargs):
+    """Wrapper para ejecutar run_query desde otros contextos."""
     return run_query(**kwargs)
 
 
 if __name__ == "__main__":
+    # Manejo de argumentos de línea de comandos
     parser = argparse.ArgumentParser(
         description="Download PubMed papers to CSV and JSONL"
     )
