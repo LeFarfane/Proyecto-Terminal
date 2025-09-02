@@ -75,9 +75,7 @@ def normalize_text(text: str) -> str:
 
 
 def sanitize_term(term: str) -> str:
-    """Escape special characters in PubMed search terms."""
-    # Escapa comillas para la consulta
-    term = term.replace('"', '\"')
+    """Wrap the term in double quotes for PubMed phrase search."""
     return f'"{term}"'
 
 def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000", sort="relevance"):
