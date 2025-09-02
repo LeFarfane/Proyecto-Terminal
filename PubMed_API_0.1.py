@@ -346,13 +346,19 @@ def run_query(
     operator: str,
     sort: str,
     pub_types: List[str],
+    pub_types_pubmed: List[str],
     batch_size: int,
     max_results: int,
     api_key: str,
     format: str,
     append: bool,
+    output_base: str,
 ):
-    query = f" {operator} ".join(terms)
+    terms_query = " {} ".format(operator).join([f"({t})" for t in terms])
+    if pub_types_pubmed:
+        query = f"{terms_query} AND ({' OR '.join(pub_types_pubmed)})"
+    else:
+        query = terms_query
     setup_logging("PubMed_API_0.1.log")
     logger.info("Script version: %s", __version__)
     logger.info(
@@ -365,11 +371,13 @@ def run_query(
             "operator": operator,
             "sort": sort,
             "pub_types": pub_types,
+            "pub_types_pubmed": pub_types_pubmed,
             "batch_size": batch_size,
             "max_results": max_results,
             "api_key_provided": bool(api_key),
             "format": format,
             "append": append,
+            "output_base": output_base,
         },
     )
 
@@ -377,8 +385,8 @@ def run_query(
     article_types = [normalize_text(t).lower() for t in pub_types]
     languages = []
 
-    output_csv = "papers.csv" if format in ("csv", "both") else None
-    output_jsonl = "papers.jsonl" if format in ("jsonl", "both") else None
+    output_csv = f"{output_base}.csv" if format in ("csv", "both") else None
+    output_jsonl = f"{output_base}.jsonl" if format in ("jsonl", "both") else None
 
     if not append:
         if output_csv and os.path.exists(output_csv):
@@ -453,17 +461,25 @@ if __name__ == "__main__":
         action="store_true",
         help="Append to existing files instead of overwriting",
     )
+    parser.add_argument(
+        "--output_base",
+        default="papers",
+        help="Base name for output files",
+    )
     args = parser.parse_args()
     terms = [t.strip() for t in args.terms.split(";") if t.strip()]
     pub_types = [pt.strip() for pt in args.pub_types.split(",") if pt.strip()]
+    pub_types_pubmed = [f"{pt}[Publication Type]" for pt in pub_types]
     main(
         terms=terms,
         operator=args.operator,
         sort=args.sort,
         pub_types=pub_types,
+        pub_types_pubmed=pub_types_pubmed,
         batch_size=args.batch_size,
         max_results=args.max_results,
         api_key=args.api_key,
         format=args.format,
         append=args.append,
+        output_base=args.output_base,
     )
