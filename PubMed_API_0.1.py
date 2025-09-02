@@ -7,10 +7,13 @@ import re
 import time
 import unicodedata
 import xml.etree.ElementTree as ET
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-import email.utils
-import requests
 from typing import List
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
@@ -25,6 +28,15 @@ logger = logging.getLogger(__name__)
 
 session = requests.Session()
 session.headers.update(headers)
+retry_strategy = Retry(
+    total=5,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["HEAD", "GET", "OPTIONS"],
+    backoff_factor=1,
+)
+adapter = HTTPAdapter(max_retries=retry_strategy)
+session.mount("https://", adapter)
+session.mount("http://", adapter)
 
 api_key = os.getenv("NCBI_API_KEY", "")
 
@@ -32,6 +44,8 @@ api_key = os.getenv("NCBI_API_KEY", "")
 def setup_logging(log_file: str) -> None:
     """Configure logging to console and a file."""
     logger.setLevel(logging.INFO)
+    if logger.handlers:
+        logger.handlers.clear()
     formatter = logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
 
     fh = logging.FileHandler(log_file)
@@ -53,42 +67,10 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def requests_get_with_retries(
-    url, params=None, headers=None, max_retries=5, backoff_factor=1, timeout=10
-):
-    """Make GET requests with retries on network errors or 429/5xx responses.
-
-    Respects ``Retry-After`` headers when provided by the server to comply with
-    usage guidelines. Implements exponential backoff between retries.
-    """
-    for attempt in range(max_retries):
-        try:
-            response = session.get(url, params=params, headers=headers, timeout=timeout)
-            # Retry on 429 or server errors
-            if response.status_code == 429 or response.status_code >= 500:
-                retry_after = response.headers.get("Retry-After")
-                if retry_after:
-                    try:
-                        delay = float(retry_after)
-                    except ValueError:
-                        try:
-                            retry_date = email.utils.parsedate_to_datetime(retry_after)
-                            delay = (retry_date - datetime.now(timezone.utc)).total_seconds()
-                        except Exception:
-                            delay = backoff_factor * (2 ** attempt)
-                else:
-                    delay = backoff_factor * (2 ** attempt)
-                if delay > 0:
-                    time.sleep(delay)
-                continue
-            response.raise_for_status()
-            return response
-        except requests.exceptions.RequestException:
-            if attempt == max_retries - 1:
-                raise
-            time.sleep(backoff_factor * (2 ** attempt))
-    raise RuntimeError("Max retries exceeded for GET request")
-
+def sanitize_term(term: str) -> str:
+    """Escape special characters in PubMed search terms."""
+    term = term.replace('"', '\"')
+    return f'"{term}"'
 
 def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000", sort="relevance"):
     """Return a deduplicated list of PMIDs for the search term."""
@@ -108,9 +90,7 @@ def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000", sor
         }
         if api_key:
             search_params["api_key"] = api_key
-        search_response = requests_get_with_retries(
-            search_url, params=search_params, headers=headers
-        )
+        search_response = session.get(search_url, params=search_params, timeout=10)
         search_response.raise_for_status()
         pmids = search_response.json().get("esearchresult", {}).get("idlist", [])
         pmids = list(dict.fromkeys(pmids))
@@ -172,6 +152,21 @@ This increases the request rate limits when running `PubMed_API_0.1.py`.
         f.write(content)
 
 
+@dataclass
+class Article:
+    PMID: str
+    Title: str
+    Abstract: str
+    Authors: str
+    Year: str
+    Journal: str
+    Volume: str
+    Issue: str
+    Pages: str
+    DOI: str
+    citation_apa: str
+
+
 def download_articles(
     pmids,
     api_key,
@@ -190,23 +185,10 @@ def download_articles(
         if output_csv:
             csv_exists = os.path.isfile(output_csv)
             csvfile = open(output_csv, "a", newline="", encoding="utf-8")
-            csv_writer = csv.writer(csvfile)
+            fieldnames = list(Article.__annotations__.keys())
+            csv_writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             if not csv_exists:
-                csv_writer.writerow(
-                    [
-                        "PMID",
-                        "Title",
-                        "Abstract",
-                        "Authors",
-                        "Year",
-                        "Journal",
-                        "Volume",
-                        "Issue",
-                        "Pages",
-                        "DOI",
-                        "citation_apa",
-                    ]
-                )
+                csv_writer.writeheader()
         if output_jsonl:
             jsonlfile = open(output_jsonl, "a", encoding="utf-8")
 
@@ -222,9 +204,7 @@ def download_articles(
             if api_key:
                 params["api_key"] = api_key
             try:
-                response = requests_get_with_retries(
-                    fetch_url, params=params, headers=headers
-                )
+                response = session.get(fetch_url, params=params, timeout=10)
                 response.raise_for_status()
                 batch_root = ET.fromstring(response.text)
                 for article in batch_root.findall("PubmedArticle"):
@@ -294,41 +274,24 @@ def download_articles(
                         doi,
                     )
 
-                    row = [
-                        pmid,
-                        title,
-                        abstract,
-                        authors,
-                        year,
-                        journal,
-                        volume,
-                        issue,
-                        pages,
-                        doi,
-                        citation,
-                    ]
+                    article = Article(
+                        PMID=pmid,
+                        Title=title,
+                        Abstract=abstract,
+                        Authors=authors,
+                        Year=year,
+                        Journal=journal,
+                        Volume=volume,
+                        Issue=issue,
+                        Pages=pages,
+                        DOI=doi,
+                        citation_apa=citation,
+                    )
                     if csv_writer:
-                        csv_writer.writerow(row)
+                        csv_writer.writerow(asdict(article))
                     if jsonlfile:
-                        jsonlfile.write(
-                            json.dumps(
-                                {
-                                    "PMID": pmid,
-                                    "Title": title,
-                                    "Abstract": abstract,
-                                    "Authors": authors,
-                                    "Year": year,
-                                    "Journal": journal,
-                                    "Volume": volume,
-                                    "Issue": issue,
-                                    "Pages": pages,
-                                    "DOI": doi,
-                                    "citation_apa": citation,
-                                },
-                                ensure_ascii=False,
-                            )
-                            + "\n"
-                        )
+                        json.dump(asdict(article), jsonlfile, ensure_ascii=False)
+                        jsonlfile.write("\n")
                     saved += 1
             except Exception as e:
                 logger.error("Error retrieving PMIDs %s: %s", batch, e)
@@ -354,7 +317,8 @@ def run_query(
     append: bool,
     output_base: str,
 ):
-    terms_query = " {} ".format(operator).join([f"({t})" for t in terms])
+    sanitized_terms = [sanitize_term(t) for t in terms]
+    terms_query = f" {operator} ".join([f"({t})" for t in sanitized_terms])
     if pub_types_pubmed:
         query = f"{terms_query} AND ({' OR '.join(pub_types_pubmed)})"
     else:
