@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 import email.utils
 import requests
+from typing import List
 
 search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
@@ -89,7 +90,7 @@ def requests_get_with_retries(
     raise RuntimeError("Max retries exceeded for GET request")
 
 
-def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000"):
+def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000", sort="relevance"):
     """Return a deduplicated list of PMIDs for the search term."""
     pmids = []
     try:
@@ -103,6 +104,7 @@ def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000"):
             "maxdate": maxdate,
             "tool": TOOL,
             "email": EMAIL,
+            "sort": sort,
         }
         if api_key:
             search_params["api_key"] = api_key
@@ -177,31 +179,36 @@ def download_articles(
     output_jsonl,
     article_types,
     languages,
+    batch_size=100,
 ):
     """Fetch article details for each PMID and write them to CSV and JSONL."""
-    batch_size = 100  # NCBI recommends batching 50-100 IDs per request
     saved = 0
-    csv_exists = os.path.isfile(output_csv)
-    with open(output_csv, "a", newline="", encoding="utf-8") as csvfile, open(
-        output_jsonl, "a", encoding="utf-8"
-    ) as jsonlfile:
-        writer = csv.writer(csvfile)
-        if not csv_exists:
-            writer.writerow(
-                [
-                    "PMID",
-                    "Title",
-                    "Abstract",
-                    "Authors",
-                    "Year",
-                    "Journal",
-                    "Volume",
-                    "Issue",
-                    "Pages",
-                    "DOI",
-                    "citation_apa",
-                ]
-            )
+    csv_writer = None
+    csvfile = None
+    jsonlfile = None
+    try:
+        if output_csv:
+            csv_exists = os.path.isfile(output_csv)
+            csvfile = open(output_csv, "a", newline="", encoding="utf-8")
+            csv_writer = csv.writer(csvfile)
+            if not csv_exists:
+                csv_writer.writerow(
+                    [
+                        "PMID",
+                        "Title",
+                        "Abstract",
+                        "Authors",
+                        "Year",
+                        "Journal",
+                        "Volume",
+                        "Issue",
+                        "Pages",
+                        "DOI",
+                        "citation_apa",
+                    ]
+                )
+        if output_jsonl:
+            jsonlfile = open(output_jsonl, "a", encoding="utf-8")
 
         for i in range(0, len(pmids), batch_size):
             batch = pmids[i : i + batch_size]
@@ -300,39 +307,131 @@ def download_articles(
                         doi,
                         citation,
                     ]
-                    writer.writerow(row)
-                    jsonlfile.write(
-                        json.dumps(
-                            {
-                                "PMID": pmid,
-                                "Title": title,
-                                "Abstract": abstract,
-                                "Authors": authors,
-                                "Year": year,
-                                "Journal": journal,
-                                "Volume": volume,
-                                "Issue": issue,
-                                "Pages": pages,
-                                "DOI": doi,
-                                "citation_apa": citation,
-                            },
-                            ensure_ascii=False,
+                    if csv_writer:
+                        csv_writer.writerow(row)
+                    if jsonlfile:
+                        jsonlfile.write(
+                            json.dumps(
+                                {
+                                    "PMID": pmid,
+                                    "Title": title,
+                                    "Abstract": abstract,
+                                    "Authors": authors,
+                                    "Year": year,
+                                    "Journal": journal,
+                                    "Volume": volume,
+                                    "Issue": issue,
+                                    "Pages": pages,
+                                    "DOI": doi,
+                                    "citation_apa": citation,
+                                },
+                                ensure_ascii=False,
+                            )
+                            + "\n"
                         )
-                        + "\n"
-                    )
                     saved += 1
             except Exception as e:
                 logger.error("Error retrieving PMIDs %s: %s", batch, e)
             time.sleep(0.1)
+    finally:
+        if csvfile:
+            csvfile.close()
+        if jsonlfile:
+            jsonlfile.close()
     return saved
 
 
-def main():
+def run_query(
+    terms: List[str],
+    operator: str,
+    sort: str,
+    pub_types: List[str],
+    batch_size: int,
+    max_results: int,
+    api_key: str,
+    format: str,
+    append: bool,
+):
+    search_term = f" {operator} ".join(terms)
+    setup_logging("PubMed_API_0.1.log")
+    logger.info("Script version: %s", __version__)
+    logger.info(
+        "Run date: %s", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+    )
+    logger.info(
+        "Parameters: %s",
+        {
+            "terms": terms,
+            "operator": operator,
+            "sort": sort,
+            "pub_types": pub_types,
+            "batch_size": batch_size,
+            "max_results": max_results,
+            "api_key_provided": bool(api_key),
+            "format": format,
+            "append": append,
+        },
+    )
+
+    pmids = search_pmids(search_term, max_results, api_key, sort=sort)
+    article_types = [normalize_text(t).lower() for t in pub_types]
+    languages = []
+
+    output_csv = "papers.csv" if format in ("csv", "both") else None
+    output_jsonl = "papers.jsonl" if format in ("jsonl", "both") else None
+
+    if not append:
+        if output_csv and os.path.exists(output_csv):
+            os.remove(output_csv)
+        if output_jsonl and os.path.exists(output_jsonl):
+            os.remove(output_jsonl)
+
+    count = download_articles(
+        pmids,
+        api_key,
+        output_csv,
+        output_jsonl,
+        article_types,
+        languages,
+        batch_size,
+    )
+    write_readme(search_term, count, __version__)
+    logger.info("Saved %d articles", count)
+    return count
+
+
+def main(**kwargs):
+    return run_query(**kwargs)
+
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Download PubMed papers to CSV and JSONL"
     )
     parser.add_argument(
-        "--search_term", default="microRNA", help="Term to search for in PubMed"
+        "--terms",
+        default="microRNA",
+        help="Semicolon-separated terms to search for in PubMed",
+    )
+    parser.add_argument(
+        "--operator",
+        default="AND",
+        choices=["AND", "OR", "NOT"],
+        help="Operator to combine terms",
+    )
+    parser.add_argument(
+        "--sort", default="relevance", help="Sort order for results"
+    )
+    parser.add_argument(
+        "--pub_types",
+        default="Journal Article",
+        help="Comma-separated publication types to include",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=100,
+        help="efetch batch size (50-200)",
     )
     parser.add_argument(
         "--max_results",
@@ -341,58 +440,30 @@ def main():
         help="Maximum number of results to fetch",
     )
     parser.add_argument(
-        "--mindate", default="2020", help="Minimum publication year"
+        "--api_key", default="", help="NCBI API key"
     )
     parser.add_argument(
-        "--maxdate", default="3000", help="Maximum publication year"
+        "--format",
+        default="both",
+        choices=["csv", "jsonl", "both"],
+        help="Output format",
     )
     parser.add_argument(
-        "--article_types",
-        default="Journal Article",
-        help="Comma-separated publication types to include",
-    )
-    parser.add_argument(
-        "--languages",
-        default="eng,spa",
-        help="Comma-separated language codes to include",
-    )
-    parser.add_argument(
-        "--output_csv", default="papers.csv", help="CSV output file"
-    )
-    parser.add_argument(
-        "--output_jsonl", default="papers.jsonl", help="JSONL output file"
-    )
-    parser.add_argument(
-        "--log_file", default="PubMed_API_0.1.log", help="Log file path"
+        "--append",
+        action="store_true",
+        help="Append to existing files instead of overwriting",
     )
     args = parser.parse_args()
-
-    setup_logging(args.log_file)
-    logger.info("Script version: %s", __version__)
-    logger.info(
-        "Run date: %s", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+    terms = [t.strip() for t in args.terms.split(";") if t.strip()]
+    pub_types = [pt.strip() for pt in args.pub_types.split(",") if pt.strip()]
+    main(
+        terms=terms,
+        operator=args.operator,
+        sort=args.sort,
+        pub_types=pub_types,
+        batch_size=args.batch_size,
+        max_results=args.max_results,
+        api_key=args.api_key,
+        format=args.format,
+        append=args.append,
     )
-    logger.info("Parameters: %s", vars(args))
-
-    pmids = search_pmids(
-        args.search_term, args.max_results, api_key, args.mindate, args.maxdate
-    )
-    article_types = [
-        normalize_text(t).lower() for t in args.article_types.split(",") if t
-    ]
-    languages = [normalize_text(l).lower() for l in args.languages.split(",") if l]
-
-    count = download_articles(
-        pmids,
-        api_key,
-        args.output_csv,
-        args.output_jsonl,
-        article_types,
-        languages,
-    )
-    write_readme(args.search_term, count, __version__)
-    logger.info("Saved %d articles", count)
-
-
-if __name__ == "__main__":
-    main()
