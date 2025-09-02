@@ -3,10 +3,13 @@ import csv
 import time
 import argparse
 import xml.etree.ElementTree as ET
+import os
 
 search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 headers = {"User-Agent": "Proyecto-Terminal (eduardo_bio12@outlook.com)"}
+
+api_key = os.getenv("NCBI_API_KEY", "")
 
 parser = argparse.ArgumentParser(description="Download PubMed papers to CSV")
 parser.add_argument("--search_term", default="microRNA", help="Term to search for in PubMed")
@@ -23,6 +26,8 @@ try:
         "retmode": "json",
         "retmax": args.max_results,
     }
+    if api_key:
+        search_params["api_key"] = api_key
     if args.start_year:
         search_params["mindate"] = args.start_year
         search_params["datetype"] = "pdat"
@@ -43,6 +48,8 @@ with open("papers.csv", "w", newline='', encoding="utf-8") as csvfile:
             "id": pmid,
             "retmode": "xml",
         }
+        if api_key:
+            params["api_key"] = api_key
         try:
             response = requests.get(fetch_url, params=params, headers=headers)
             response.raise_for_status()
