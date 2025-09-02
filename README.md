@@ -2,9 +2,9 @@
 
 ## Última búsqueda
 - Término: microRNA
-- Artículos guardados: 0
+- Artículos guardados: 4
 
-Generado el 2025-09-02 11:05:00 UTC con versión 0.2.
+Generado el 2025-09-02 11:16:52 UTC con versión 0.2.
 
 ## Environment Variables
 
