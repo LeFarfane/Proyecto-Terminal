@@ -48,52 +48,113 @@ def requests_get_with_retries(url, params=None, headers=None, max_retries=5, bac
             time.sleep(backoff_factor * (2 ** attempt))
     raise RuntimeError("Max retries exceeded for GET request")
 
-parser = argparse.ArgumentParser(description="Download PubMed papers to CSV")
-parser.add_argument("--search_term", default="microRNA", help="Term to search for in PubMed")
-parser.add_argument("--max_results", type=int, default=5, help="Maximum number of results to fetch")
-parser.add_argument("--start_year", type=int, default=None, help="Start year for articles (optional)")
-args = parser.parse_args()
 
-# obtener PMIDs a partir del término de búsqueda
-pmids = []
-try:
-    search_params = {
-        "db": "pubmed",
-        "term": args.search_term,
-        "retmode": "json",
-        "retmax": args.max_results,
-    }
-    if api_key:
-        search_params["api_key"] = api_key
-    if args.start_year:
-        search_params["mindate"] = args.start_year
-        search_params["datetype"] = "pdat"
-    search_response = requests_get_with_retries(search_url, params=search_params, headers=headers)
-    search_response.raise_for_status()
-    pmids = search_response.json().get("esearchresult", {}).get("idlist", [])
-except Exception as e:
-    print(f"Error searching term '{args.search_term}': {e}")
-
-# creación del documento:
-with open("papers.csv", "w", newline='', encoding="utf-8") as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerow(["PMID", "Title", "Abstract"])
-
-    for pmid in pmids:
-        params = {
+def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000"):
+    """Return a list of PMIDs for the search term."""
+    pmids = []
+    try:
+        search_params = {
             "db": "pubmed",
-            "id": pmid,
-            "retmode": "xml",
+            "term": term,
+            "retmode": "json",
+            "retmax": max_results,
+            "datetype": "pdat",
+            "mindate": mindate,
+            "maxdate": maxdate,
         }
         if api_key:
-            params["api_key"] = api_key
-        try:
-            response = requests_get_with_retries(fetch_url, params=params, headers=headers)
-            response.raise_for_status()
-            root = ET.fromstring(response.text)
-            title = root.findtext(".//ArticleTitle", default="")
-            abstract = root.findtext(".//Abstract/AbstractText", default="")
-            writer.writerow([pmid, title, abstract])
-        except Exception as e:
-            print(f"Error retrieving PMID {pmid}: {e}")
-        time.sleep(0.1)
+            search_params["api_key"] = api_key
+        search_response = requests_get_with_retries(
+            search_url, params=search_params, headers=headers
+        )
+        search_response.raise_for_status()
+        pmids = search_response.json().get("esearchresult", {}).get("idlist", [])
+    except Exception as e:
+        print(f"Error searching term '{term}': {e}")
+    return pmids
+
+
+def download_articles(pmids, api_key, output_path):
+    """Fetch article details for each PMID and write them to a CSV file."""
+    batch_size = 100  # NCBI recommends batching 50-100 IDs per request
+    with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["PMID", "Title", "Abstract", "Authors", "Year", "Journal"])
+
+        for i in range(0, len(pmids), batch_size):
+            batch = pmids[i : i + batch_size]
+            params = {
+                "db": "pubmed",
+                "id": ",".join(batch),
+                "retmode": "xml",
+            }
+            if api_key:
+                params["api_key"] = api_key
+            try:
+                response = requests_get_with_retries(
+                    fetch_url, params=params, headers=headers
+                )
+                response.raise_for_status()
+                batch_root = ET.fromstring(response.text)
+                for article in batch_root.findall("PubmedArticle"):
+                    root = article
+                    title_elem = root.find(".//ArticleTitle")
+                    title = (
+                        "".join(title_elem.itertext()).strip()
+                        if title_elem is not None
+                        else ""
+                    )
+
+                    abstract_parts = []
+                    for node in root.findall(".//Abstract/AbstractText"):
+                        text = "".join(node.itertext()).strip()
+                        label = node.get("Label")
+                        if label:
+                            abstract_parts.append(f"{label}: {text}")
+                        else:
+                            abstract_parts.append(text)
+                    abstract = " ".join(abstract_parts)
+
+                    authors = "; ".join(
+                        [
+                            f"{author.findtext('LastName', '')} {author.findtext('Initials', '')}".strip()
+                            for author in root.findall(".//AuthorList/Author")
+                            if author.findtext("LastName") or author.findtext("Initials")
+                        ]
+                    )
+                    year = root.findtext(".//PubDate/Year", default="")
+                    journal = root.findtext(".//Journal/Title", default="")
+                    pmid = root.findtext(".//PMID", default="")
+                    writer.writerow([pmid, title, abstract, authors, year, journal])
+            except Exception as e:
+                print(f"Error retrieving PMIDs {batch}: {e}")
+            time.sleep(0.1)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Download PubMed papers to CSV")
+    parser.add_argument(
+        "--search_term", default="microRNA", help="Term to search for in PubMed"
+    )
+    parser.add_argument(
+        "--max_results",
+        type=int,
+        default=5,
+        help="Maximum number of results to fetch",
+    )
+    parser.add_argument(
+        "--mindate", default="2020", help="Minimum publication year"
+    )
+    parser.add_argument(
+        "--maxdate", default="3000", help="Maximum publication year"
+    )
+    args = parser.parse_args()
+
+    pmids = search_pmids(
+        args.search_term, args.max_results, api_key, args.mindate, args.maxdate
+    )
+    download_articles(pmids, api_key, "papers.csv")
+
+
+if __name__ == "__main__":
+    main()
