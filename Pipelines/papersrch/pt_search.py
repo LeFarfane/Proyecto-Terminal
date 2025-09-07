@@ -4,6 +4,7 @@ import json
 import os
 import re
 from collections import defaultdict
+from pathlib import Path
 from typing import List, Dict, Any
 
 import numpy as np
@@ -13,21 +14,41 @@ from sklearn.metrics.pairwise import cosine_similarity
 import matplotlib.pyplot as plt
 import networkx as nx
 
-from text_utils import normalize_text, tokenize, expand_query_terms, DOMAIN_KEYWORDS
+try:  # Allow running as module or script
+    from .text_utils import (
+        normalize_text,
+        tokenize,
+        expand_query_terms,
+        DOMAIN_KEYWORDS,
+    )
+except ImportError:  # pragma: no cover - fallback for direct execution
+    from text_utils import (
+        normalize_text,
+        tokenize,
+        expand_query_terms,
+        DOMAIN_KEYWORDS,
+    )
+
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 # ----------------------------- Data loading -----------------------------
 
-def load_corpus(jsonl_path: str = "papers.jsonl", csv_path: str = "papers.csv") -> pd.DataFrame:
+def load_corpus(
+    jsonl_path: str | Path | None = None,
+    csv_path: str | Path | None = None,
+) -> pd.DataFrame:
+    jsonl_path = Path(jsonl_path) if jsonl_path else BASE_DIR / "data" / "papers" / "papers.jsonl"
+    csv_path = Path(csv_path) if csv_path else BASE_DIR / "data" / "papers" / "papers.csv"
     records: List[Dict[str, Any]] = []
-    if os.path.exists(jsonl_path):
-        with open(jsonl_path, "r", encoding="utf-8") as f:
+    if jsonl_path.exists():
+        with jsonl_path.open("r", encoding="utf-8") as f:
             for line in f:
                 try:
                     records.append(json.loads(line))
                 except json.JSONDecodeError:
                     continue
-    elif os.path.exists(csv_path):
+    elif csv_path.exists():
         print("Warning: papers.jsonl not found, using CSV")
         df_csv = pd.read_csv(csv_path)
         records = df_csv.to_dict(orient="records")
