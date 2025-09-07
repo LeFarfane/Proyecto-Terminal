@@ -7,6 +7,10 @@ import importlib.util
 import getpass
 import re
 import inspect
+from pathlib import Path
+
+
+CURRENT_DIR = Path(__file__).resolve().parent
 
 def prompt_list(message: str, default: str, sep: str) -> list:
     """Obtiene una lista a partir de una cadena separada por un delimitador."""
@@ -285,7 +289,10 @@ def main():
 
     append = prompt_yes_no("Append to existing files", "y")
 
-    output_base = input("Base name for output files [papers]: ").strip() or "papers"
+    output_base_name = input("Base name for output files [papers]: ").strip() or "papers"
+    output_dir = CURRENT_DIR.parents[1] / "data" / "papers"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_base = output_dir / output_base_name
 
     # Resumen de parámetros elegido por el usuario
     summary = {
@@ -299,7 +306,7 @@ def main():
         "api_key_provided": api_key_provided,
         "format": output_format,
         "append": append,
-        "output_base": output_base,
+        "output_base": str(output_base),
         "systematic_sb": systematic_sb,
     }
     print(json.dumps(summary, indent=2))
@@ -314,7 +321,7 @@ def main():
 
     # Carga dinámica del módulo de consulta a PubMed
     spec = importlib.util.spec_from_file_location(
-        "PubMed_API_0_1", "PubMed_API_0.1.py"
+        "PubMed_API_0_1", CURRENT_DIR / "PubMed_API_0.1.py"
     )
     pubmed_api = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(pubmed_api)
@@ -329,7 +336,7 @@ def main():
         "api_key": api_key,
         "format": output_format,
         "append": append,
-        "output_base": output_base,
+        "output_base": str(output_base),
     }
     # Se pasan argumentos opcionales si la función los soporta
     if "pub_types_pubmed" in run_signature.parameters:
