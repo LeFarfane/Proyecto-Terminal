@@ -22,6 +22,9 @@ LOGFILE="${OUT_LOGS}/00_search.log"
 DEFAULT_QUERY='("inflammatory bowel disease"[All Fields] OR "ulcerative colitis"[All Fields] OR Crohn[All Fields]) AND (miRNA OR microRNA) AND "Homo sapiens"[Organism]'
 QUERY="${1:-$DEFAULT_QUERY}"
 
+# Modo de salida: "overwrite" (default) o "append" para acumular resultados
+MODE="${2:-overwrite}"
+
 # --- Funciones ---
 log() { echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOGFILE" ; }
 
@@ -34,7 +37,9 @@ need_cmd() {
 
 # --- Inicio ---
 mkdir -p "$OUT_SEARCH" "$OUT_RUNS" "$OUT_LOGS"
-: > "$LOGFILE"
+if [[ "$MODE" != "append" ]]; then
+  : > "$LOGFILE"
+fi
 log "Starting 00_search (EDirect discovery) ..."
 log "Root dir: $ROOT_DIR"
 log "Outputs:  $OUT_SEARCH  |  $OUT_RUNS"
@@ -97,7 +102,9 @@ log "PMIDs linked: ${PMID_ROWS}"
 
 # 5) esummary por UID → JSONL
 log "Writing esummary JSONL per GDS UID ..."
-: > "${OUT_SEARCH}/datasets.jsonl"
+if [[ "$MODE" != "append" ]]; then
+  : > "${OUT_SEARCH}/datasets.jsonl"
+fi
 if [[ "$UID_COUNT" -gt 0 ]]; then
   while read -r uid; do
     [[ -z "$uid" ]] && continue
@@ -109,31 +116,86 @@ log "datasets.jsonl size: $(wc -c < "${OUT_SEARCH}/datasets.jsonl" | tr -d ' ') 
 # 6) (Opcional) índice TSV legible si jq está disponible
 if [[ "$HAVE_JQ" -eq 1 ]]; then
   log "jq detected — creating datasets_index.tsv ..."
-  jq -r '
-    .result[]? | select(.acc) |
-    [
-      .acc,
-      (.title // ""),
-      (.gdsType // ""),
-      (.n_samples // .ssCount // 0),
-      (.taxname // ""),
-      (.PDAT // .pdat // ""),
-      (.gpl // "")
-    ] | @tsv
-  ' "${OUT_SEARCH}/datasets.jsonl" > "${OUT_SEARCH}/datasets_index.tsv" || true
+  if [[ "$MODE" == "append" ]]; then
+    jq -r '
+      .result[]? | select(.acc) |
+      [
+        .acc,
+        (.title // ""),
+        (.gdsType // ""),
+        (.n_samples // .ssCount // 0),
+        (.taxname // ""),
+        (.PDAT // .pdat // ""),
+        (.gpl // "")
+      ] | @tsv
+    ' "${OUT_SEARCH}/datasets.jsonl" >> "${OUT_SEARCH}/datasets_index.tsv" || true
+  else
+    jq -r '
+      .result[]? | select(.acc) |
+      [
+        .acc,
+        (.title // ""),
+        (.gdsType // ""),
+        (.n_samples // .ssCount // 0),
+        (.taxname // ""),
+        (.PDAT // .pdat // ""),
+        (.gpl // "")
+      ] | @tsv
+    ' "${OUT_SEARCH}/datasets.jsonl" > "${OUT_SEARCH}/datasets_index.tsv" || true
+  fi
   log "datasets_index.tsv rows: $(wc -l < "${OUT_SEARCH}/datasets_index.tsv" | tr -d ' ')"
 else
-  log "jq not found — skipping datasets_index.tsv (optional)."
+  log "jq not found — using Python fallback for datasets_index.tsv ..."
+  python3 <<PY
+import json, csv, pathlib
+mode = 'a' if '$MODE' == 'append' else 'w'
+out_search = pathlib.Path('$OUT_SEARCH')
+src = out_search / 'datasets.jsonl'
+dst = out_search / 'datasets_index.tsv'
+rows = []
+with open(src, 'r', encoding='utf-8') as f:
+    for line in f:
+        try:
+            rec = json.loads(line)['result'][0]
+        except Exception:
+            continue
+        rows.append([
+            rec.get('acc', ''),
+            rec.get('title', ''),
+            rec.get('gdsType', ''),
+            rec.get('n_samples', rec.get('ssCount', 0)),
+            rec.get('taxname', ''),
+            rec.get('PDAT', rec.get('pdat', '')),
+            rec.get('gpl', '')
+        ])
+with open(dst, mode, newline='', encoding='utf-8') as out:
+    writer = csv.writer(out, delimiter='\t')
+    writer.writerows(rows)
+PY
+  if [[ -f "${OUT_SEARCH}/datasets_index.tsv" ]]; then
+    log "datasets_index.tsv rows: $(wc -l < "${OUT_SEARCH}/datasets_index.tsv" | tr -d ' ')"
+  else
+    log "Python fallback failed — datasets_index.tsv not created."
+  fi
 fi
 
 # 7) Provenance
 log "Writing provenance.txt ..."
-{
-  echo "query: $QUERY"
-  echo "date_utc: $(date -u +%FT%TZ)"
-  echo "webenv: $WEBENV"
-  echo "query_key: $QK"
-} > "${OUT_SEARCH}/provenance.txt"
+if [[ "$MODE" == "append" ]]; then
+  {
+    echo "query: $QUERY"
+    echo "date_utc: $(date -u +%FT%TZ)"
+    echo "webenv: $WEBENV"
+    echo "query_key: $QK"
+  } >> "${OUT_SEARCH}/provenance.txt"
+else
+  {
+    echo "query: $QUERY"
+    echo "date_utc: $(date -u +%FT%TZ)"
+    echo "webenv: $WEBENV"
+    echo "query_key: $QK"
+  } > "${OUT_SEARCH}/provenance.txt"
+fi
 
 # 8) (Opcional) Enlaces a BioProject/BioSample usando la columna Run si existe
 if [[ "$RUN_ROWS" -gt 1 ]]; then
