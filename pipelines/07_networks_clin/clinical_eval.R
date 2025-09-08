@@ -57,7 +57,7 @@ write("", file = LOGFILE)
 #   numeric_vars_csv= "" (si vacío, detecta numeric en meta; prioriza Mayo, CDAI, CRP, calprotectina)
 args <- commandArgs(trailingOnly = TRUE)
 default_counts <- file.path(ROOT_DIR, "results", "DEA", "normalized_counts_deseq2.csv")
-default_meta   <- file.path(ROOT_DIR, "metadata", "sample_metadata.csv")
+default_meta   <- file.path(ROOT_DIR, "data", "metadata", "sample_metadata.csv")
 counts_csv     <- if (length(args) >= 1 && nzchar(args[[1]])) args[[1]] else default_counts
 meta_csv       <- if (length(args) >= 2 && nzchar(args[[2]])) args[[2]] else default_meta
 mirna_list_fn  <- if (length(args) >= 3 && nzchar(args[[3]])) args[[3]] else ""

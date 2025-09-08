@@ -34,8 +34,8 @@ SCRIPT_PATH <- tryCatch(get_script_path(), error = function(e) normalizePath(get
 ROOT_DIR <- normalizePath(file.path(dirname(SCRIPT_PATH), "..", ".."))  # .../PT
 
 # --- Defaults (sobre-escribibles por args) ---
-default_counts <- file.path(ROOT_DIR, "data_processed", "miRNA_counts_raw.csv")
-default_meta   <- file.path(ROOT_DIR, "metadata", "sample_metadata.csv")
+default_counts <- file.path(ROOT_DIR, "data", "data_processed", "miRNA_counts_raw.csv")
+default_meta   <- file.path(ROOT_DIR, "data", "metadata", "sample_metadata.csv")
 DEA_DIR   <- file.path(ROOT_DIR, "results", "DEA")
 FIG_DIR   <- file.path(DEA_DIR, "figures")
 LOG_DIR   <- file.path(ROOT_DIR, "outputs", "logs")
