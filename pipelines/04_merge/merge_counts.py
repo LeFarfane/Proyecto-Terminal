@@ -158,9 +158,9 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("quant_dir", nargs="?", default=str(ROOT_DIR / "results" / "quant_mirge3"),
                     help="Directory with per-sample subfolders (miRge3/miRDeep2 outputs).")
-parser.add_argument("metadata_csv", nargs="?", default=str(ROOT_DIR / "metadata" / "sample_metadata.csv"),
+parser.add_argument("metadata_csv", nargs="?", default=str(ROOT_DIR / "data" / "metadata" / "sample_metadata.csv"),
                     help="Metadata CSV with columns run_accession and sample_id (optional).")
-parser.add_argument("out_csv", nargs="?", default=str(ROOT_DIR / "data_processed" / "miRNA_counts_raw.csv"),
+parser.add_argument("out_csv", nargs="?", default=str(ROOT_DIR / "data" / "data_processed" / "miRNA_counts_raw.csv"),
                     help="Output counts matrix CSV.")
 parser.add_argument("--prefer-mirna-col", default=None, help="Preferred miRNA column name if known.")
 parser.add_argument("--prefer-count-col", default=None, help="Preferred count column name if known.")
