@@ -79,31 +79,44 @@ def sanitize_term(term: str) -> str:
     return f'"{term}"'
 
 def search_pmids(term, max_results, api_key, mindate="2020", maxdate="3000", sort="relevance"):
-    """Return a deduplicated list of PMIDs for the search term."""
-    # Realiza la búsqueda de PMIDs en PubMed
+    """Return a deduplicated list of PMIDs for the search term.
+
+    PubMed's ESearch no longer honors ``retmax``. This function paginates
+    through results using ``retstart`` until ``max_results`` PMIDs are
+    collected or the record count is exhausted.
+    """
     pmids = []
+    retstart = 0
+    count = max_results
     try:
-        search_params = {
-            "db": "pubmed",
-            "term": term,
-            "retmode": "json",
-            "retmax": max_results,
-            "datetype": "pdat",
-            "mindate": mindate,
-            "maxdate": maxdate,
-            "tool": TOOL,
-            "email": EMAIL,
-            "sort": sort,
-        }
-        if api_key:
-            search_params["api_key"] = api_key
-        search_response = session.get(search_url, params=search_params, timeout=10)
-        search_response.raise_for_status()
-        pmids = search_response.json().get("esearchresult", {}).get("idlist", [])
-        pmids = list(dict.fromkeys(pmids))
+        while len(pmids) < max_results and retstart < count:
+            search_params = {
+                "db": "pubmed",
+                "term": term,
+                "retmode": "json",
+                "retstart": retstart,
+                "datetype": "pdat",
+                "mindate": mindate,
+                "maxdate": maxdate,
+                "tool": TOOL,
+                "email": EMAIL,
+                "sort": sort,
+            }
+            if api_key:
+                search_params["api_key"] = api_key
+            search_response = session.get(search_url, params=search_params, timeout=10)
+            search_response.raise_for_status()
+            result = search_response.json().get("esearchresult", {})
+            ids = result.get("idlist", [])
+            count = int(result.get("count", 0))
+            pmids.extend(ids)
+            retstart += len(ids)
+            if not ids:
+                break
     except Exception as e:
         logger.error("Error searching term '%s': %s", term, e)
-    return pmids
+    pmids = list(dict.fromkeys(pmids))
+    return pmids[:max_results]
 
 
 def format_authors_apa(authors_list):
@@ -191,7 +204,11 @@ def download_articles(
     query_terms,
     batch_size=100,
 ):
-    """Fetch article details for each PMID and write them to CSV and JSONL."""
+    """Fetch article details for each PMID and write them to CSV and JSONL.
+
+    The PubMed ``efetch`` requests are issued in batches controlled by
+    ``batch_size`` to avoid overly long URL queries.
+    """
     # Descarga artículos en lotes y guarda los resultados
     saved = 0
     csv_writer = None
