@@ -10,6 +10,8 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+export NCBI_EDIRECT_USE_CURL=1  # force curl backend for reliability
+
 # --- Rutas ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -22,6 +24,8 @@ LOGFILE="${OUT_LOGS}/00_search.log"
 DEFAULT_QUERY='("inflammatory bowel disease"[All Fields] OR "ulcerative colitis"[All Fields] OR Crohn[All Fields]) AND (miRNA OR microRNA) AND "Homo sapiens"[Organism]'
 QUERY="${1:-$DEFAULT_QUERY}"
 MODE="${2:-overwrite}"   # overwrite | append
+ESRETMAX="${ESRETMAX:-100000}"   # esearch -retmax limit
+EFETCHSTOP="${EFETCHSTOP:-100000}" # efetch -stop limit
 
 # --- Utils ---
 timestamp(){ date +"%Y-%m-%d %H:%M:%S"; }
@@ -56,8 +60,8 @@ if have esearch && have elink && have efetch && have esummary && have xtract; th
   log "EDirect detected — using native esearch/elink/efetch."
   HAVE_JQ=0; have jq && HAVE_JQ=1
 
-  log "Running esearch (db=gds, usehistory=y) ..."
-  esearch -db gds -query "$QUERY" -usehistory y > "${OUT_SEARCH}/gds_search.xml" || { log "ERROR: esearch failed"; exit 1; }
+  log "Running esearch (history default, retmax=${ESRETMAX}) ..."
+  esearch -db gds -query "$QUERY" -retmax "$ESRETMAX" > "${OUT_SEARCH}/gds_search.xml" || { log "ERROR: esearch failed"; exit 1; }
 
   WEBENV="$(xtract -input "${OUT_SEARCH}/gds_search.xml" -pattern ENTREZ_DIRECT -element WebEnv || true)"
   QK="$(xtract -input "${OUT_SEARCH}/gds_search.xml" -pattern ENTREZ_DIRECT -element QueryKey || true)"
@@ -79,19 +83,19 @@ if have esearch && have elink && have efetch && have esummary && have xtract; th
   fi
   log "Captured WebEnv and QueryKey."
 
-  log "Fetching GDS UIDs ..."
-  efetch -db gds -format uid -webenv "$WEBENV" -query_key "$QK" > "${OUT_SEARCH}/gds_uids.txt" || { log "WARN: efetch UIDs failed"; : > "${OUT_SEARCH}/gds_uids.txt"; }
+  log "Fetching GDS UIDs (stop=${EFETCHSTOP}) ..."
+  efetch -db gds -format uid -webenv "$WEBENV" -query_key "$QK" -stop "$EFETCHSTOP" > "${OUT_SEARCH}/gds_uids.txt" || { log "WARN: efetch UIDs failed"; : > "${OUT_SEARCH}/gds_uids.txt"; }
   UID_COUNT="$(wc -l < "${OUT_SEARCH}/gds_uids.txt" | tr -d ' ')"
   log "Found ${UID_COUNT} GDS UIDs."
 
-  log "Linking GDS → SRA and exporting runinfo.csv ..."
-  elink -dbfrom gds -db sra -webenv "$WEBENV" -query_key "$QK" | efetch -format runinfo > "${OUT_RUNS}/gds_to_sra_runinfo.csv" || { log "WARN: elink/efetch runinfo failed"; echo "Run" > "${OUT_RUNS}/gds_to_sra_runinfo.csv"; }
+  log "Linking GDS → SRA and exporting runinfo.csv (stop=${EFETCHSTOP}) ..."
+  elink -dbfrom gds -db sra -webenv "$WEBENV" -query_key "$QK" | efetch -format runinfo -stop "$EFETCHSTOP" > "${OUT_RUNS}/gds_to_sra_runinfo.csv" || { log "WARN: elink/efetch runinfo failed"; echo "Run" > "${OUT_RUNS}/gds_to_sra_runinfo.csv"; }
 
   RUN_ROWS="$(wc -l < "${OUT_RUNS}/gds_to_sra_runinfo.csv" | tr -d ' ')"
   if [[ "$RUN_ROWS" -le 1 ]]; then log "No SRA runs resolved (runinfo header only)."; else log "runinfo.csv rows: ${RUN_ROWS}"; fi
 
-  log "Linking GDS → PubMed PMIDs ..."
-  elink -dbfrom gds -db pubmed -webenv "$WEBENV" -query_key "$QK" | efetch -format uid > "${OUT_SEARCH}/gds_to_pubmed_pmids.txt" || { log "WARN: elink PubMed failed"; : > "${OUT_SEARCH}/gds_to_pubmed_pmids.txt"; }
+  log "Linking GDS → PubMed PMIDs (stop=${EFETCHSTOP}) ..."
+  elink -dbfrom gds -db pubmed -webenv "$WEBENV" -query_key "$QK" | efetch -format uid -stop "$EFETCHSTOP" > "${OUT_SEARCH}/gds_to_pubmed_pmids.txt" || { log "WARN: elink PubMed failed"; : > "${OUT_SEARCH}/gds_to_pubmed_pmids.txt"; }
   PMID_ROWS="$(wc -l < "${OUT_SEARCH}/gds_to_pubmed_pmids.txt" | tr -d ' ')"
   log "PMIDs linked: ${PMID_ROWS}"
 
@@ -159,8 +163,9 @@ HAVE_JQ=0; have jq && HAVE_JQ=1
 
 # 1) esearch vía E-utilities (JSON)
 Q_ENC="$(rawurlencode "$QUERY")"
-ESEARCH_URL="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=gds&retmode=json&retmax=100000&term=${Q_ENC}"
+ESEARCH_URL="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=gds&retmode=json&retmax=${ESRETMAX}&term=${Q_ENC}"
 ESEARCH_JSON="${OUT_SEARCH}/gds_search.json"
+log "Running esearch via curl (retmax=${ESRETMAX}) ..."
 curl -sS "$ESEARCH_URL" -o "$ESEARCH_JSON" || { log "ERROR: esearch curl failed"; exit 1; }
 
 python3 - "$ESEARCH_JSON" "${OUT_SEARCH}/gds_uids.txt" << 'PY'
