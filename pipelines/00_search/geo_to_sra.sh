@@ -24,7 +24,6 @@ LOGFILE="${OUT_LOGS}/00_search.log"
 DEFAULT_QUERY='("inflammatory bowel disease"[All Fields] OR "ulcerative colitis"[All Fields] OR Crohn[All Fields]) AND (miRNA OR microRNA) AND "Homo sapiens"[Organism]'
 QUERY="${1:-$DEFAULT_QUERY}"
 MODE="${2:-overwrite}"   # overwrite | append
-ESRETMAX="${ESRETMAX:-100000}"   # esearch -retmax limit
 EFETCHSTOP="${EFETCHSTOP:-100000}" # efetch -stop limit
 
 # --- Utils ---
@@ -60,8 +59,8 @@ if have esearch && have elink && have efetch && have esummary && have xtract; th
   log "EDirect detected — using native esearch/elink/efetch."
   HAVE_JQ=0; have jq && HAVE_JQ=1
 
-  log "Running esearch (history default, retmax=${ESRETMAX}) ..."
-  esearch -db gds -query "$QUERY" -retmax "$ESRETMAX" > "${OUT_SEARCH}/gds_search.xml" || { log "ERROR: esearch failed"; exit 1; }
+  log "Running esearch (history mode) ..."
+  esearch -db gds -query "$QUERY" > "${OUT_SEARCH}/gds_search.xml" || { log "ERROR: esearch failed"; exit 1; }
 
   WEBENV="$(xtract -input "${OUT_SEARCH}/gds_search.xml" -pattern ENTREZ_DIRECT -element WebEnv || true)"
   QK="$(xtract -input "${OUT_SEARCH}/gds_search.xml" -pattern ENTREZ_DIRECT -element QueryKey || true)"
@@ -83,19 +82,19 @@ if have esearch && have elink && have efetch && have esummary && have xtract; th
   fi
   log "Captured WebEnv and QueryKey."
 
-  log "Fetching GDS UIDs (stop=${EFETCHSTOP}) ..."
-  efetch -db gds -format uid -webenv "$WEBENV" -query_key "$QK" -stop "$EFETCHSTOP" > "${OUT_SEARCH}/gds_uids.txt" || { log "WARN: efetch UIDs failed"; : > "${OUT_SEARCH}/gds_uids.txt"; }
+  log "Fetching GDS UIDs (start=1, stop=${EFETCHSTOP}) ..."
+  efetch -db gds -format uid -webenv "$WEBENV" -query_key "$QK" -start 1 -stop "$EFETCHSTOP" > "${OUT_SEARCH}/gds_uids.txt" || { log "WARN: efetch UIDs failed"; : > "${OUT_SEARCH}/gds_uids.txt"; }
   UID_COUNT="$(wc -l < "${OUT_SEARCH}/gds_uids.txt" | tr -d ' ')"
   log "Found ${UID_COUNT} GDS UIDs."
 
-  log "Linking GDS → SRA and exporting runinfo.csv (stop=${EFETCHSTOP}) ..."
-  elink -dbfrom gds -db sra -webenv "$WEBENV" -query_key "$QK" | efetch -format runinfo -stop "$EFETCHSTOP" > "${OUT_RUNS}/gds_to_sra_runinfo.csv" || { log "WARN: elink/efetch runinfo failed"; echo "Run" > "${OUT_RUNS}/gds_to_sra_runinfo.csv"; }
+  log "Linking GDS → SRA and exporting runinfo.csv (start=1, stop=${EFETCHSTOP}) ..."
+  elink -dbfrom gds -db sra -webenv "$WEBENV" -query_key "$QK" | efetch -format runinfo -start 1 -stop "$EFETCHSTOP" > "${OUT_RUNS}/gds_to_sra_runinfo.csv" || { log "WARN: elink/efetch runinfo failed"; echo "Run" > "${OUT_RUNS}/gds_to_sra_runinfo.csv"; }
 
   RUN_ROWS="$(wc -l < "${OUT_RUNS}/gds_to_sra_runinfo.csv" | tr -d ' ')"
   if [[ "$RUN_ROWS" -le 1 ]]; then log "No SRA runs resolved (runinfo header only)."; else log "runinfo.csv rows: ${RUN_ROWS}"; fi
 
-  log "Linking GDS → PubMed PMIDs (stop=${EFETCHSTOP}) ..."
-  elink -dbfrom gds -db pubmed -webenv "$WEBENV" -query_key "$QK" | efetch -format uid -stop "$EFETCHSTOP" > "${OUT_SEARCH}/gds_to_pubmed_pmids.txt" || { log "WARN: elink PubMed failed"; : > "${OUT_SEARCH}/gds_to_pubmed_pmids.txt"; }
+  log "Linking GDS → PubMed PMIDs (start=1, stop=${EFETCHSTOP}) ..."
+  elink -dbfrom gds -db pubmed -webenv "$WEBENV" -query_key "$QK" | efetch -format uid -start 1 -stop "$EFETCHSTOP" > "${OUT_SEARCH}/gds_to_pubmed_pmids.txt" || { log "WARN: elink PubMed failed"; : > "${OUT_SEARCH}/gds_to_pubmed_pmids.txt"; }
   PMID_ROWS="$(wc -l < "${OUT_SEARCH}/gds_to_pubmed_pmids.txt" | tr -d ' ')"
   log "PMIDs linked: ${PMID_ROWS}"
 
@@ -136,8 +135,8 @@ if have esearch && have elink && have efetch && have esummary && have xtract; th
     TMP_RUNS="$(mktemp)"
     awk -F',' 'NR==1{for(i=1;i<=NF;i++){if($i=="Run") c=i}} NR>1 && c{print $c}' "${OUT_RUNS}/gds_to_sra_runinfo.csv" | sort -u > "$TMP_RUNS" || true
     if [[ -s "$TMP_RUNS" ]]; then
-      elink -dbfrom sra -db bioproject -id $(paste -sd, "$TMP_RUNS") | efetch -format uid > "${OUT_SEARCH}/sra_to_bioproject.txt" || true
-      elink -dbfrom sra -db biosample  -id $(paste -sd, "$TMP_RUNS") | efetch -format uid > "${OUT_SEARCH}/sra_to_biosample.txt"  || true
+      elink -dbfrom sra -db bioproject -id $(paste -sd, "$TMP_RUNS") | efetch -format uid -start 1 -stop "$EFETCHSTOP" > "${OUT_SEARCH}/sra_to_bioproject.txt" || true
+      elink -dbfrom sra -db biosample  -id $(paste -sd, "$TMP_RUNS") | efetch -format uid -start 1 -stop "$EFETCHSTOP" > "${OUT_SEARCH}/sra_to_biosample.txt"  || true
     fi
     rm -f "$TMP_RUNS"
   fi
@@ -163,35 +162,42 @@ HAVE_JQ=0; have jq && HAVE_JQ=1
 
 # 1) esearch vía E-utilities (JSON)
 Q_ENC="$(rawurlencode "$QUERY")"
-ESEARCH_URL="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=gds&retmode=json&retmax=${ESRETMAX}&term=${Q_ENC}"
+ESEARCH_URL="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=gds&retmode=json&usehistory=y&term=${Q_ENC}"
 ESEARCH_JSON="${OUT_SEARCH}/gds_search.json"
-log "Running esearch via curl (retmax=${ESRETMAX}) ..."
+log "Running esearch via curl (history mode) ..."
 curl -sS "$ESEARCH_URL" -o "$ESEARCH_JSON" || { log "ERROR: esearch curl failed"; exit 1; }
 
-python3 - "$ESEARCH_JSON" "${OUT_SEARCH}/gds_uids.txt" << 'PY'
-import sys, json, pathlib
-js, outp = sys.argv[1], sys.argv[2]
+# Extract WebEnv and QueryKey for subsequent efetch
+read WEBENV QK COUNT < <(
+  python3 - "$ESEARCH_JSON" <<'PY'
+import sys, json
+js = sys.argv[1]
 data = json.load(open(js, "r", encoding="utf-8"))
-ids = data.get("esearchresult", {}).get("idlist", [])
-pathlib.Path(outp).write_text("\n".join(map(str, ids))+"\n" if ids else "", encoding="utf-8")
+res = data.get("esearchresult", {})
+print(res.get("webenv", ""), res.get("querykey", ""), res.get("count", "0"))
 PY
+)
+
+log "esearch count: ${COUNT}"
+EFETCH_UIDS_URL="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=gds&rettype=uilist&retstart=0&retmax=${EFETCHSTOP}&query_key=${QK}&WebEnv=${WEBENV}"
+curl -sS "$EFETCH_UIDS_URL" -o "${OUT_SEARCH}/gds_uids.txt" || { log "ERROR: efetch curl failed"; : > "${OUT_SEARCH}/gds_uids.txt"; }
 
 UID_COUNT=$( [ -f "${OUT_SEARCH}/gds_uids.txt" ] && wc -l < "${OUT_SEARCH}/gds_uids.txt" | tr -d ' ' || echo 0 )
 log "Found ${UID_COUNT} GDS UIDs."
 
-if [[ "$UID_COUNT" -eq 0 ]]; then
-  echo "Run" > "${OUT_RUNS}/gds_to_sra_runinfo.csv"
-  : > "${OUT_SEARCH}/gds_to_pubmed_pmids.txt"
-  : > "${OUT_SEARCH}/datasets.jsonl"
-  {
-    echo "query: $QUERY"
-    echo "date_utc: $(date -u +%FT%TZ)"
-    echo "webenv: "
-    echo "query_key: "
-  } > "${OUT_SEARCH}/provenance.txt"
-  log "00_search complete (sin resultados)."
-  exit 0
-fi
+  if [[ "$UID_COUNT" -eq 0 ]]; then
+    echo "Run" > "${OUT_RUNS}/gds_to_sra_runinfo.csv"
+    : > "${OUT_SEARCH}/gds_to_pubmed_pmids.txt"
+    : > "${OUT_SEARCH}/datasets.jsonl"
+    {
+      echo "query: $QUERY"
+      echo "date_utc: $(date -u +%FT%TZ)"
+      echo "webenv: $WEBENV"
+      echo "query_key: $QK"
+    } > "${OUT_SEARCH}/provenance.txt"
+    log "00_search complete (sin resultados)."
+    exit 0
+  fi
 
 # 2) elink GDS→SRA y GDS→PubMed (JSON), en batches
 mapfile -t GDS_IDS < "${OUT_SEARCH}/gds_uids.txt"
@@ -352,12 +358,12 @@ else
   log "jq not found — skipping datasets_index.tsv (optional)."
 fi
 
-# 6) provenance (sin WebEnv/QueryKey en fallback)
+# 6) provenance
 {
   echo "query: $QUERY"
   echo "date_utc: $(date -u +%FT%TZ)"
-  echo "webenv: "
-  echo "query_key: "
+  echo "webenv: $WEBENV"
+  echo "query_key: $QK"
 } > "${OUT_SEARCH}/provenance.txt"
 
 # 7) opcional SRA→BioProject/BioSample
