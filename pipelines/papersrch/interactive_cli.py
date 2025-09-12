@@ -272,12 +272,14 @@ def main():
     if not api_key:
         if prompt_yes_no("Do you want to paste an API key now? (y/n)", "n"):
             while True:
-                key = getpass.getpass("API key: ").strip()
+                key = input("API key: ").strip()
                 if not key:
                     api_key = ""
+                    print("NO API KEY FOUND")
                     break
                 if re.fullmatch(r"[A-Za-z0-9]{20,80}", key):
                     api_key = key
+                    print("API KEY FOUND")
                     break
                 print("Invalid API key format. Enter 20-80 alphanumeric characters or leave blank to skip.")
             api_key_provided = bool(api_key)
