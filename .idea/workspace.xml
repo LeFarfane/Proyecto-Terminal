@@ -5,14 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="1b9bcb26-50f6-4283-ac7a-b9d300a6047f" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/Pipelines.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Pipelines.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/csv-editor.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/csv-editor.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/papers/papers.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/papers/papers.jsonl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/papers/papers.csv" beforeDir="false" afterPath="$PROJECT_DIR$/data/papers/papers.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/papers/papers.jsonl" beforeDir="false" afterPath="$PROJECT_DIR$/data/papers/papers.jsonl" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pipelines/papersrch/interactive_cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/papersrch/interactive_cli.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pipelines/papersrch/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/papersrch/README.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -55,6 +53,7 @@
     &quot;Python.PubMed_API_0.1.executor&quot;: &quot;Run&quot;,
     &quot;Python.interactive_cli.executor&quot;: &quot;Run&quot;,
     &quot;Python.pt_search.executor&quot;: &quot;Run&quot;,
+    &quot;Python.refineria.executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
@@ -72,11 +71,11 @@
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
     &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Shell Script.geo_to_sra.sh 0.1">
     <configuration name="geo_to_sra.sh 0.1" type="ShConfigurationType">
       <option name="SCRIPT_TEXT" value="" />
       <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
