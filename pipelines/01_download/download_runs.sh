@@ -93,27 +93,6 @@ log "Hilos fasterq: $FQ_THREADS | Trabajos paralelos: $PAR_JOBS"
 for c in prefetch fasterq-dump awk sort xargs; do need_cmd "$c"; done
 command -v pigz >/dev/null 2>&1 || log "[info] pigz no encontrado; usaré gzip"
 
-# Configuración opcional de SRA (cache local)
-export NCBI_SETTINGS="${NCBI_SETTINGS:-${ROOT_DIR}/.ncbi}"
-mkdir -p "$NCBI_SETTINGS"
-
-# Recolectar SRR y guardarlos para traza
-TMP_SRR="$(mktemp)"
-collect_srrs "$INPUT_RUNS" > "$TMP_SRR"
-TOTAL_SRR="$(wc -l < "$TMP_SRR" | tr -d ' ')"
-[[ "$TOTAL_SRR" -gt 0 ]] || { log "ERROR: no se encontraron SRR en la entrada."; rm -f "$TMP_SRR"; exit 1; }
-log "Total de SRR a descargar: $TOTAL_SRR"
-
-# Descargar en paralelo
-log "Descargando corridas SRA..."
-xargs -I{} -P "${PAR_JOBS}" bash -c 'download_one "$@"' _ {} "$OUTPUT_DIR" "$FQ_THREADS" < "$TMP_SRR"
-
-# Limpieza temporal
-rm -f "$TMP_SRR"
-
-# Verificación final
-DL_COUNT=$(ls -1 "${OUTPUT_DIR}"/SRR*.fastq.gz 2>/dev/null | wc -l | tr -d ' ')
-if [[ "$DL_COUNT" -gt 0 ]]; then
   log "Descarga completa. Archivos .fastq.gz generados: $DL_COUNT"
 else
   log "WARN: No se encontraron .fastq.gz en ${OUTPUT_DIR}. Revisa el log."

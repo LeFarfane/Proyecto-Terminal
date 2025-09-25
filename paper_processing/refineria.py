@@ -23,57 +23,56 @@ print(work["PMID"].duplicated().sum())
 #print(work.loc[0:5, "Title"])
 
 #first we will normalize all titles so it's easier to filter through them.
-work["Title"] = work["Title"].str.title()
-
+work["Title"] = work["Title"].str.lower()
+work["Abstract"] = work["Abstract"].str.lower()
 
 #Now lets remove the undesired paper.
 #We will do that by using a list of keywords that of no interest to us.
 
-unwanted_keywords = ['Dental',
-                    'Cancer',
-                    'Mouse',
-                    'Rat',
-                    'Mice',
-                    'Drugs',
-                    'Drug',
-                    'Assessment',
-                    'Ct',
-                    'Surgery',
-                    'Magnetic',
-                    'Imagining',
-                    'Mri',
-                    'Vitamin',
-                    'Vitamin',
-                    'Herbal',
-                    'Covid',
-                    'Nutritional',
-                    'Tumor',
-                    'Acupuncture',
-                    'Pharmacologic',
-                    'Pharmacology',
-                    'Postoperative',
-                    'Coffee',
-                    'Coping',
-                    'Management',
-                    'Diet',
-                    'Oral',
-                    'Heart',
-                    'Stroke',
-                    'Carcinogenesis',
-                    'Oil',
-                    'Psychological',
-                    'Safety',
-                    'Rhinitis',
-                    'Consumption',
-                    'Dosing',
-                    'Coronavirus',
-                    'Radiation',
-                    'Vaccination',
-                    'Violence',
-                    'Telemedicine',
+unwanted_keywords = [
+    'dental',
+    'cancer',
+    'mouse',
+    'rat',
+    'mice',
+    'drugs',
+    'drug',
+    'assessment',
+    'ct',
+    'surgery',
+    'magnetic',
+    'imagining',
+    'mri',
+    'vitamin',
+    'herbal',
+    'covid',
+    'nutritional',
+    'tumor',
+    'acupuncture',
+    'pharmacologic',
+    'pharmacology',
+    'postoperative',
+    'coffee',
+    'coping',
+    'management',
+    'diet',
+    'oral',
+    'heart',
+    'stroke',
+    'carcinogenesis',
+    'oil',
+    'psychological',
+    'safety',
+    'rhinitis',
+    'consumption',
+    'dosing',
+    'coronavirus',
+    'radiation',
+    'vaccination',
+    'violence',
+    'telemedicine',
+    ]
 
-
-                    ]
 
 #now we detect which articles have the unwanted words. and will add a tag into another column to identify them.
 def contains_bad(title, keywords):
@@ -116,21 +115,23 @@ print(f"This is the info for dumpster: {dumpster.shape}")
 what will do is to create a list of the most useful keywords and create a dataset with the most useful papers
 """
 useful_keywords = [
-    'MiRNA',
-    'MicroARN',
-    'Prediction',
-    'IBD',
-    'Markers',
-    'Biomarkers',
-    'Artificial',
-    'Intelligence',
+    #,
+    'microarn',
+    'prediction',
+    'ibd',
+    'markers',
+    'biomarkers',
+    'artificial',
+    'intelligence',
     ]
 
-#now we detect which articles have the useful words. and will add a tag into another column to identify them.
-def contains_useful(title, keywords):
-    return any(keywords in title for keywords in keywords)
 
-work["wanted"] = work["Title", "Abstract"].apply(lambda x: contains_useful(x, useful_keywords))
+#now we detect which articles have the useful words. and will add a tag into another column to identify them.
+def contains_useful(row, keywords):
+    text = f"{row["Title"]} {row["Abstract"]}"
+    return any(k in text for k in keywords)
+
+work["wanted"] = work.apply(lambda row: contains_useful(row, useful_keywords), axis=1)
 
 #then we split it
 wanted = work[work["wanted"]].copy()
@@ -138,5 +139,11 @@ work = work[~work["wanted"]].copy()
 
 print("Kept:", len(work), " → Useful:", len(wanted))
 
-#Temporary creation for visualization purposes of work dataset
-save_to_dumpster(work, r"D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\data\papers\dumpster\temporary.csv")
+#custumize the path
+useful_path = r"D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\data\papers\dumpster\useful.csv"
+wanted["Title"] = wanted["Title"].str.title()
+save_to_dumpster(wanted, useful_path)
+
+work_path = r"D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\data\papers\dumpster\work.csv"
+work["Title"] = work["Title"].str.title()
+save_to_dumpster(work, work_path)

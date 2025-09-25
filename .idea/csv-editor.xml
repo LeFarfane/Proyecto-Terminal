@@ -17,7 +17,28 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\data\papers\dumpster\useful.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\data\papers\dumpster\work.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\data\papers\papers.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\data\sequences\mirna\mirna_lit_seq.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -32,6 +53,27 @@
           </value>
         </entry>
         <entry key="\pipelines\01_download\runinfo.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\run_test_1.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\runinfo.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\runs.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

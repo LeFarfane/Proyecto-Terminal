@@ -24,7 +24,7 @@ headers = {"User-Agent": "Proyecto-Terminal (eduardo_bio12@outlook.com)"}
 TOOL = "Proyecto-Terminal"
 EMAIL = "eduardo_bio12@outlook.com"
 
-__version__ = "0.2"
+__version__ = "0.5"
 
 # Logger principal del módulo
 logger = logging.getLogger(__name__)

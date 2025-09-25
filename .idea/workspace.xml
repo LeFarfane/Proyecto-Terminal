@@ -5,12 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="1b9bcb26-50f6-4283-ac7a-b9d300a6047f" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/data/sequences/mirna/mirna_lit_seq.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pipelines/00_search/skeleton.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/csv-editor.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/csv-editor.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/papers/papers.csv" beforeDir="false" afterPath="$PROJECT_DIR$/data/papers/papers.csv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/papers/papers.jsonl" beforeDir="false" afterPath="$PROJECT_DIR$/data/papers/papers.jsonl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/papers/dumpster/dumpster.csv" beforeDir="false" afterPath="$PROJECT_DIR$/data/papers/dumpster/dumpster.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/paper_processing/refineria.py" beforeDir="false" afterPath="$PROJECT_DIR$/paper_processing/refineria.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pipelines/papersrch/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/papersrch/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pipelines/01_download/download_runs.sh" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/01_download/download_runs.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pipelines/papersrch/PubMed_API_0.1.py" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/papersrch/PubMed_API_0.1.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -47,123 +50,54 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;Python.PubMed_API_0.1.executor&quot;: &quot;Run&quot;,
-    &quot;Python.interactive_cli.executor&quot;: &quot;Run&quot;,
-    &quot;Python.pt_search.executor&quot;: &quot;Run&quot;,
-    &quot;Python.refineria.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;SHELLCHECK.PATH&quot;: &quot;C:\\Users\\EFarf\\AppData\\Roaming\\JetBrains\\PyCharm2025.2\\plugins\\Shell Script\\shellcheck.exe&quot;,
-    &quot;Shell Script.geo_to_sra.sh 0.1.executor&quot;: &quot;Run&quot;,
-    &quot;Shell Script.geo_to_sra.sh 0.2.executor&quot;: &quot;Run&quot;,
-    &quot;Shell Script.geo_to_sra.sh 0.3.executor&quot;: &quot;Run&quot;,
-    &quot;Shell Script.geo_to_sra.sh 0.4.executor&quot;: &quot;Run&quot;,
-    &quot;Shell Script.geo_to_sra.sh 0.5.executor&quot;: &quot;Run&quot;,
-    &quot;Shell Script.geo_to_sra.sh.executor&quot;: &quot;Run&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Python.PubMed_API_0.1.executor": "Run",
+    "Python.interactive_cli.executor": "Run",
+    "Python.mirna_lit_seq.executor": "Run",
+    "Python.pt_search.executor": "Run",
+    "Python.refineria.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "SHELLCHECK.PATH": "C:\\Users\\EFarf\\AppData\\Roaming\\JetBrains\\PyCharm2025.2\\plugins\\Shell Script\\shellcheck.exe",
+    "Shell Script.Cygwin.executor": "Run",
+    "Shell Script.bash.executor": "Run",
+    "Shell Script.geo_to_sra.sh 0.1.executor": "Run",
+    "Shell Script.geo_to_sra.sh 0.2.executor": "Run",
+    "Shell Script.geo_to_sra.sh 0.3.executor": "Run",
+    "Shell Script.geo_to_sra.sh 0.4.executor": "Run",
+    "Shell Script.geo_to_sra.sh 0.5.executor": "Run",
+    "Shell Script.geo_to_sra.sh.executor": "Run",
+    "deletionFromPopupRequiresConfirmation": "false",
+    "git-widget-placeholder": "main",
+    "ignore.virus.scanning.warn.message": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
-  <component name="RunManager" selected="Shell Script.geo_to_sra.sh 0.1">
-    <configuration name="geo_to_sra.sh 0.1" type="ShConfigurationType">
+}]]></component>
+  <component name="RunManager">
+    <configuration name="Cygwin" type="ShConfigurationType">
       <option name="SCRIPT_TEXT" value="" />
       <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
       <option name="SCRIPT_PATH" value="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" />
       <option name="SCRIPT_OPTIONS" value="" />
       <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
-      <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/pipelines/00_search" />
-      <option name="INDEPENDENT_INTERPRETER_PATH" value="false" />
-      <option name="INTERPRETER_PATH" value="C:/Program Files/Git/usr/bin/bash.exe" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="EXECUTE_IN_TERMINAL" value="true" />
-      <option name="EXECUTE_SCRIPT_FILE" value="true" />
-      <envs>
-        <env name="PATH" value="C:\cygwin64\home\EFarf\edirect" />
-      </envs>
-      <method v="2" />
-    </configuration>
-    <configuration name="geo_to_sra.sh 0.2" type="ShConfigurationType">
-      <option name="SCRIPT_TEXT" value="" />
-      <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
-      <option name="SCRIPT_PATH" value="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" />
-      <option name="SCRIPT_OPTIONS" value="" />
-      <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
-      <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/pipelines/00_search" />
-      <option name="INDEPENDENT_INTERPRETER_PATH" value="false" />
-      <option name="INTERPRETER_PATH" value="C:/Program Files/Git/usr/bin/bash.exe" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="EXECUTE_IN_TERMINAL" value="true" />
-      <option name="EXECUTE_SCRIPT_FILE" value="true" />
-      <envs>
-        <env name="PATH" value="C:\cygwin64\home\EFarf\edirect;C:\cygwin64\home\EFarf\edirect;" />
-      </envs>
-      <method v="2" />
-    </configuration>
-    <configuration name="geo_to_sra.sh 0.3" type="ShConfigurationType">
-      <option name="SCRIPT_TEXT" value="" />
-      <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
-      <option name="SCRIPT_PATH" value="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" />
-      <option name="SCRIPT_OPTIONS" value="" />
-      <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
-      <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/pipelines/00_search" />
+      <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
       <option name="INDEPENDENT_INTERPRETER_PATH" value="false" />
       <option name="INTERPRETER_PATH" value="C:/cygwin64/bin/bash.exe" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="EXECUTE_IN_TERMINAL" value="true" />
-      <option name="EXECUTE_SCRIPT_FILE" value="true" />
-      <envs>
-        <env name="PATH" value="C:\cygwin64\bin" />
-      </envs>
-      <method v="2" />
-    </configuration>
-    <configuration name="geo_to_sra.sh 0.4" type="ShConfigurationType">
-      <option name="SCRIPT_TEXT" value="" />
-      <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
-      <option name="SCRIPT_PATH" value="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" />
-      <option name="SCRIPT_OPTIONS" value="" />
-      <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
-      <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/pipelines/00_search" />
-      <option name="INDEPENDENT_INTERPRETER_PATH" value="false" />
-      <option name="INTERPRETER_PATH" value="C:/cygwin64/bin/bash.exe" />
-      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="INTERPRETER_OPTIONS" value="bash" />
       <option name="EXECUTE_IN_TERMINAL" value="true" />
       <option name="EXECUTE_SCRIPT_FILE" value="true" />
       <envs />
       <method v="2" />
     </configuration>
-    <configuration name="geo_to_sra.sh 0.5" type="ShConfigurationType">
-      <option name="SCRIPT_TEXT" value="" />
-      <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
-      <option name="SCRIPT_PATH" value="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" />
-      <option name="SCRIPT_OPTIONS" value="" />
-      <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
-      <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/pipelines/00_search" />
-      <option name="INDEPENDENT_INTERPRETER_PATH" value="false" />
-      <option name="INTERPRETER_PATH" value="C:/cygwin64/bin/bash.exe" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="EXECUTE_IN_TERMINAL" value="true" />
-      <option name="EXECUTE_SCRIPT_FILE" value="true" />
-      <envs />
-      <method v="2" />
-    </configuration>
-    <list>
-      <item itemvalue="Shell Script.geo_to_sra.sh 0.1" />
-      <item itemvalue="Shell Script.geo_to_sra.sh 0.2" />
-      <item itemvalue="Shell Script.geo_to_sra.sh 0.3" />
-      <item itemvalue="Shell Script.geo_to_sra.sh 0.4" />
-      <item itemvalue="Shell Script.geo_to_sra.sh 0.5" />
-    </list>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
