@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 # Set up the path and read the file into the script.
-path = r"D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\data\papers\papers.jsonl"
+path = r"/data/papers/papers.jsonl"
 papers = pd.read_json(path, lines=True)
 
 #Creating safe copy
@@ -87,7 +87,7 @@ work = work[~work["unwanted"]].copy()
 print("Kept:", len(work), " → Dumpster:", len(dumpster))
 
 #custumize the path
-dumpster_path = r"D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\data\papers\dumpster\dumpster.csv"
+dumpster_path = r"/data/papers/dumpster/dumpster.csv"
 
 def save_to_dumpster(df, path):
     if not os.path.exists(path):
@@ -140,10 +140,10 @@ work = work[~work["wanted"]].copy()
 print("Kept:", len(work), " → Useful:", len(wanted))
 
 #custumize the path
-useful_path = r"D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\data\papers\dumpster\useful.csv"
+useful_path = r"/data/papers/dumpster/useful.csv"
 wanted["Title"] = wanted["Title"].str.title()
 save_to_dumpster(wanted, useful_path)
 
-work_path = r"D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\data\papers\dumpster\work.csv"
+work_path = r"/data/papers/dumpster/work.csv"
 work["Title"] = work["Title"].str.title()
 save_to_dumpster(work, work_path)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ===========================================
-# Script: 00_search/geo_to_sra.sh
+# Script: 00_search/archive_geo_to_sra.sh
 # Descripción: Discover GEO datasets (IBD/UC/CD + miRNA in human), resolver SRA/PubMed
 #              y exportar runinfo.csv, JSONL y provenance.
 # Nota: Modo híbrido. Usa EDirect si existe; si no, fallback con curl+Python (Replit-friendly).

@@ -40,7 +40,7 @@ This increases the request rate limits when running `PubMed_API_0.1.py`.
 
 ### 2. 00_search – Búsqueda y resolución GEO → SRA
 ```bash
-bash pipelines/00_search/geo_to_sra.sh "<tu_consulta>"
+bash pipelines/00_search/archive_geo_to_sra.sh "<tu_consulta>"
 ```
 - Sin argumentos usa la consulta por defecto para enfermedades inflamatorias y miRNA en humano
 
@@ -52,7 +52,7 @@ bash pipelines/00_search/geo_to_sra.sh "<tu_consulta>"
 
 **Ejemplo**
 ```bash
-bash pipelines/00_search/geo_to_sra.sh \
+bash pipelines/00_search/archive_geo_to_sra.sh \
 '("ulcerative colitis"[All Fields]) AND (microRNA) AND "Homo sapiens"[Organism]'
 ```
 

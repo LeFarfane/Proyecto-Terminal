@@ -5,15 +5,37 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="1b9bcb26-50f6-4283-ac7a-b9d300a6047f" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/data/sequences/mirna/mirna_lit_seq.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/pipelines/00_search/skeleton.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pipelines/00_search/Complementary scripts/01_auto_bioproject_runinfo.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pipelines/00_search/Complementary scripts/02_auto_get_biosample_attributes.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pipelines/00_search/Complementary scripts/03_runinfo_postp.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pipelines/00_search/Complementary scripts/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pipelines/00_search/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/csv-editor.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/csv-editor.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/papers/dumpster/dumpster.csv" beforeDir="false" afterPath="$PROJECT_DIR$/data/papers/dumpster/dumpster.csv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/paper_processing/refineria.py" beforeDir="false" afterPath="$PROJECT_DIR$/paper_processing/refineria.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pipelines/01_download/download_runs.sh" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/01_download/download_runs.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pipelines/papersrch/PubMed_API_0.1.py" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/papersrch/PubMed_API_0.1.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.replit" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/data_processed/miRNA_counts_filtered.csv" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/data_processed/miRNA_counts_raw.csv" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/papersrch/paper_processing/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/metadata/candidates_master.csv" beforeDir="false" afterPath="$PROJECT_DIR$/old_data/metadata/candidates_master.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/metadata/sample_metadata.csv" beforeDir="false" afterPath="$PROJECT_DIR$/old_data/metadata/sample_metadata.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/papers/dumpster/dumpster.csv" beforeDir="false" afterPath="$PROJECT_DIR$/old_data/papers/dumpster/dumpster.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/papers/dumpster/temporary.csv" beforeDir="false" afterPath="$PROJECT_DIR$/old_data/papers/dumpster/temporary.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/papers/dumpster/useful.csv" beforeDir="false" afterPath="$PROJECT_DIR$/old_data/papers/dumpster/useful.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/papers/dumpster/work.csv" beforeDir="false" afterPath="$PROJECT_DIR$/old_data/papers/dumpster/work.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/papers/papers.csv" beforeDir="false" afterPath="$PROJECT_DIR$/old_data/papers/papers.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/papers/papers.jsonl" beforeDir="false" afterPath="$PROJECT_DIR$/old_data/papers/papers.jsonl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/sequences/mirna/mirna_lit_seq.csv" beforeDir="false" afterPath="$PROJECT_DIR$/old_data/sequences/mirna/mirna_lit_seq.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/sequences/mirna/mirna_lit_seq.py" beforeDir="false" afterPath="$PROJECT_DIR$/old_data/sequences/mirna/mirna_lit_seq.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/installconfirmcat" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/installconfirmecho" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/installconfirmesearch" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/installconfirmxtract" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/outputs/.gitkeep" beforeDir="false" afterPath="$PROJECT_DIR$/old_outputs/.gitkeep" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/paper_processing/refineria.py" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/papersrch/paper_processing/refineria.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" beforeDir="false" afterPath="$PROJECT_DIR$/pipelines/00_search/Complementary scripts/archive_geo_to_sra.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pipelines/01_download/runinfo.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/runinfo.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/runs.csv" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -29,6 +51,7 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="ROOT_SYNC" value="DONT_SYNC" />
   </component>
   <component name="GitHubPullRequestSearchHistory">{
   &quot;lastFilter&quot;: {
@@ -50,54 +73,119 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.PubMed_API_0.1.executor": "Run",
-    "Python.interactive_cli.executor": "Run",
-    "Python.mirna_lit_seq.executor": "Run",
-    "Python.pt_search.executor": "Run",
-    "Python.refineria.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "SHELLCHECK.PATH": "C:\\Users\\EFarf\\AppData\\Roaming\\JetBrains\\PyCharm2025.2\\plugins\\Shell Script\\shellcheck.exe",
-    "Shell Script.Cygwin.executor": "Run",
-    "Shell Script.bash.executor": "Run",
-    "Shell Script.geo_to_sra.sh 0.1.executor": "Run",
-    "Shell Script.geo_to_sra.sh 0.2.executor": "Run",
-    "Shell Script.geo_to_sra.sh 0.3.executor": "Run",
-    "Shell Script.geo_to_sra.sh 0.4.executor": "Run",
-    "Shell Script.geo_to_sra.sh 0.5.executor": "Run",
-    "Shell Script.geo_to_sra.sh.executor": "Run",
-    "deletionFromPopupRequiresConfirmation": "false",
-    "git-widget-placeholder": "main",
-    "ignore.virus.scanning.warn.message": "true",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.PubMed_API_0.1.executor&quot;: &quot;Run&quot;,
+    &quot;Python.geo_ibd_curator.executor&quot;: &quot;Run&quot;,
+    &quot;Python.interactive_cli.executor&quot;: &quot;Run&quot;,
+    &quot;Python.mirna_lit_seq.executor&quot;: &quot;Run&quot;,
+    &quot;Python.pt_search.executor&quot;: &quot;Run&quot;,
+    &quot;Python.refineria.executor&quot;: &quot;Run&quot;,
+    &quot;Python.step_1_runinfo_postp.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHELLCHECK.PATH&quot;: &quot;C:\\Users\\EFarf\\AppData\\Roaming\\JetBrains\\PyCharm2025.2\\plugins\\Shell Script\\shellcheck.exe&quot;,
+    &quot;Shell Script.Cygwin.executor&quot;: &quot;Run&quot;,
+    &quot;Shell Script.SRA downloader.sh.executor&quot;: &quot;Run&quot;,
+    &quot;Shell Script.bash.executor&quot;: &quot;Run&quot;,
+    &quot;Shell Script.geo_to_sra.sh 0.1.executor&quot;: &quot;Run&quot;,
+    &quot;Shell Script.geo_to_sra.sh 0.2.executor&quot;: &quot;Run&quot;,
+    &quot;Shell Script.geo_to_sra.sh 0.3.executor&quot;: &quot;Run&quot;,
+    &quot;Shell Script.geo_to_sra.sh 0.4.executor&quot;: &quot;Run&quot;,
+    &quot;Shell Script.geo_to_sra.sh 0.5.executor&quot;: &quot;Run&quot;,
+    &quot;Shell Script.geo_to_sra.sh.executor&quot;: &quot;Run&quot;,
+    &quot;deletionFromPopupRequiresConfirmation&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/AAA/2. Estudios/Ingeniería en Biotecnología/Proyecto Terminal/Pipelines/pipelines/00_search/geo_ibd_out&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
-  <component name="RunManager">
-    <configuration name="Cygwin" type="ShConfigurationType">
+}</component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\pipelines\00_search\geo_ibd_out" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines" />
+      <recent name="D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\pipelines\00_search\Complementary scripts" />
+      <recent name="D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\pipelines\00_search" />
+      <recent name="D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\pipelines\papersrch" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Python.geo_ibd_curator">
+    <configuration name="geo_ibd_curator" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="Pipelines" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/pipelines/00_search" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="D:\AAA\2. Estudios\Ingeniería en Biotecnología\Proyecto Terminal\Pipelines\pipelines\00_search\geo_ibd_curator.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="step_1_runinfo_postp" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="Pipelines" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/pipelines/01_download" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/pipelines/01_download/step_1_runinfo_postp.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="SRA downloader.sh" type="ShConfigurationType">
       <option name="SCRIPT_TEXT" value="" />
       <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
-      <option name="SCRIPT_PATH" value="$PROJECT_DIR$/pipelines/00_search/geo_to_sra.sh" />
+      <option name="SCRIPT_PATH" value="$PROJECT_DIR$/pipelines/00_search/00_tool_check.sh" />
       <option name="SCRIPT_OPTIONS" value="" />
       <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
-      <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/pipelines/00_search" />
       <option name="INDEPENDENT_INTERPRETER_PATH" value="false" />
-      <option name="INTERPRETER_PATH" value="C:/cygwin64/bin/bash.exe" />
+      <option name="INTERPRETER_PATH" value="//wsl.localhost/Ubuntu/usr/bin/bash" />
       <option name="INTERPRETER_OPTIONS" value="bash" />
       <option name="EXECUTE_IN_TERMINAL" value="true" />
       <option name="EXECUTE_SCRIPT_FILE" value="true" />
       <envs />
       <method v="2" />
     </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.geo_ibd_curator" />
+        <item itemvalue="Python.step_1_runinfo_postp" />
+      </list>
+    </recent_temporary>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
