@@ -1,0 +1,16 @@
+{
+    "folder-color.pathColors": [
+        {
+            "folderPath": "Pipelines\\outputs\\a_GSE84779\\",
+            "color": "foldercolorizer.color_ff5f00"
+        },
+        {
+            "folderPath": "Pipelines\\outputs\\a_PRJNA331127\\",
+            "color": "foldercolorizer.color_ff8700"
+        },
+        {
+            "folderPath": "Pipelines\\outputs\\f_PRJNA471862\\",
+            "color": "foldercolorizer.color_87af00"
+        }
+    ]
+}

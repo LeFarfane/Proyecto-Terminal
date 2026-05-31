@@ -33,7 +33,7 @@ def clasificar_fastq():
         # 2. Identificar la columna de diagnóstico correcta (que tiene los datos)
         # Priorizamos 'disease' en minúscula porque en tu CSV 'Disease' en mayúscula está vacía.
         col_diag = None
-        for col in ['disease', 'Disease', 'Diagnosis', 'diagnosis', 'disease state', 'isolate']:
+        for col in ['disease_state', 'disease', 'Disease', 'Diagnosis', 'diagnosis', 'disease state', 'isolate']:
             # Verificamos que la columna exista y que no esté compuesta completamente por valores nulos
             if col in df_crudo.columns and not df_crudo[col].isna().all():
                 col_diag = col
