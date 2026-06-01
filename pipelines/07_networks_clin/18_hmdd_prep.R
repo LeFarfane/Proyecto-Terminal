@@ -43,17 +43,22 @@ get_script_dir <- function() {
   normalizePath(getwd())
 }
 SCRIPT_DIR <- tryCatch(get_script_dir(), error = function(e) normalizePath(getwd()))
-ROOT_DIR   <- normalizePath(file.path(SCRIPT_DIR, "..", ".."))
 
-DEA_BASE <- file.path(ROOT_DIR, "outputs", "a_PRJNA471862", "fastq",
-                      "muestras_clasificadas", "DEA_results_round_2")
-DEA_RESP <- file.path(DEA_BASE, "DEA_Default_Replace", "DEA_Default_UC_Responder.csv")
-DEA_NONR <- file.path(DEA_BASE, "DEA_Default_Replace", "DEA_Default_UC_NonResponder.csv")
-OUT_DIR  <- file.path(DEA_BASE, "clinical_outputs")
+# Run from the dataset root directory — finds DEA CSVs and metadata recursively
+RUN_DIR  <- normalizePath(getwd())
+OUT_DIR  <- file.path(RUN_DIR, "hmdd_outputs")
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 
+dea_files <- list.files(RUN_DIR, pattern = "^DEA_.*\\.csv$", recursive = TRUE, full.names = TRUE)
+if (length(dea_files) == 0) {
+  log_msg("ERROR: No DEA_*.csv files found under ", RUN_DIR, ". Run from the dataset root directory.")
+  quit(status = 1)
+}
+log_msg(sprintf("Found %d DEA files:", length(dea_files)))
+for (f in dea_files) log_msg("  ", basename(f))
+
 PADJ_THRESH <- 0.05
-LFC_THRESH  <- 1.0
+LFC_THRESH  <- 0.58
 MAX_BATCH   <- 20     # HMDD batch search hard limit
 
 URL_HMDD   <- "https://www.cuilab.cn/hmdd"
@@ -74,16 +79,11 @@ open_url <- function(url, label = url) {
   opened <- FALSE
 
   if (is_wsl) {
-    # In WSL use the Windows shell to open the browser
-    for (cmd in c(
-      sprintf("explorer.exe '%s'", url),
-      sprintf("cmd.exe /C start %s", url),
-      sprintf("powershell.exe -Command \"Start-Process '%s'\"", url)
-    )) {
-      ret <- tryCatch(system(cmd, ignore.stdout = TRUE, ignore.stderr = TRUE),
-                      error = function(e) 1L)
-      if (ret == 0L) { opened <- TRUE; break }
-    }
+    # In WSL, use powershell as the single reliable method to avoid double-opens
+    cmd <- sprintf("powershell.exe -Command \"Start-Process '%s'\"", url)
+    ret <- tryCatch(system(cmd, ignore.stdout = TRUE, ignore.stderr = TRUE),
+                    error = function(e) 1L)
+    opened <- (ret == 0L)
   } else {
     # Standard R browser opener (works on Linux with xdg-open, macOS, Windows)
     tryCatch({ browseURL(url); opened <- TRUE }, error = function(e) NULL)
@@ -100,37 +100,33 @@ log_msg("hmdd_prep.R starting")
 
 suppressWarnings(suppressMessages({ library(dplyr); library(readr) }))
 
-# ── load DEA ──────────────────────────────────────────────────────────────────
-for (p in c(DEA_RESP, DEA_NONR)) {
-  if (!file.exists(p)) { log_msg("ERROR: not found: ", p); quit(status = 1) }
+# ── load & combine all DEA files ──────────────────────────────────────────────
+dea_list <- lapply(dea_files, function(f) {
+  df <- read.csv(f, stringsAsFactors = FALSE)
+  df$contrast <- tools::file_path_sans_ext(basename(f))
+  df
+})
+dea_all <- bind_rows(dea_list)
+
+# ── filter significant miRNAs across all contrasts ────────────────────────────
+sig_all <- dea_all %>%
+  filter(!is.na(padj), padj <= PADJ_THRESH, abs(log2FoldChange) >= LFC_THRESH)
+
+if (nrow(sig_all) == 0) {
+  log_msg("ERROR: No significant miRNAs found (padj <= ", PADJ_THRESH,
+          ", |log2FC| >= ", LFC_THRESH, "). Exiting.")
+  quit(status = 1)
 }
-dea_R  <- read.csv(DEA_RESP, stringsAsFactors = FALSE)
-dea_NR <- read.csv(DEA_NONR, stringsAsFactors = FALSE)
 
-# ── filter significant miRNAs in each comparison ──────────────────────────────
-sig_R <- dea_R  %>% filter(!is.na(padj), padj <= PADJ_THRESH,
-                             abs(log2FoldChange) >= LFC_THRESH) %>%
-  select(miRNA, log2FoldChange_Resp = log2FoldChange, padj_Resp = padj)
-
-sig_NR <- dea_NR %>% filter(!is.na(padj), padj <= PADJ_THRESH,
-                              abs(log2FoldChange) >= LFC_THRESH) %>%
-  select(miRNA, log2FoldChange_NonR = log2FoldChange, padj_NonR = padj)
-
-all_cand <- full_join(sig_R, sig_NR, by = "miRNA") %>%
+# Per miRNA: keep the entry with the lowest padj across all contrasts
+all_cand <- sig_all %>%
+  group_by(miRNA) %>%
+  slice_min(padj, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
   mutate(
-    # Use smallest padj available for ranking
-    best_padj  = pmin(padj_Resp, padj_NonR, na.rm = TRUE),
-    # Best log2FC (by abs magnitude) for direction
-    best_lfc   = case_when(
-      !is.na(padj_Resp)  & !is.na(padj_NonR)  ~
-        if_else(abs(log2FoldChange_Resp) >= abs(log2FoldChange_NonR),
-                log2FoldChange_Resp, log2FoldChange_NonR),
-      !is.na(padj_Resp)  ~ log2FoldChange_Resp,
-      TRUE               ~ log2FoldChange_NonR
-    ),
-    direction  = if_else(best_lfc > 0, "UP", "DOWN"),
-    in_Resp    = !is.na(padj_Resp),
-    in_NonR    = !is.na(padj_NonR)
+    best_padj = padj,
+    best_lfc  = log2FoldChange,
+    direction = if_else(log2FoldChange > 0, "UP", "DOWN")
   ) %>%
   arrange(best_padj)
 
@@ -166,7 +162,7 @@ out_txt <- file.path(OUT_DIR, "hmdd_lists.txt")
   cat("  HMDD v4.0 miRNA Lists\n")
   cat("  Generated by hmdd_prep.R\n")
   cat(sprintf("  Date: %s\n", Sys.Date()))
-  cat(sprintf("  Criteria: padj <= %.2f  |log2FC| >= %.1f  (either DEA comparison)\n",
+  cat(sprintf("  Criteria: padj <= %.2f  |log2FC| >= %.1f  (best contrast per miRNA)\n",
               PADJ_THRESH, LFC_THRESH))
   cat(sprintf("  Total candidates: %d  (%d UP, %d DOWN)\n",
               nrow(all_cand), length(up_mirnas), length(down_mirnas)))
@@ -226,12 +222,12 @@ out_txt <- file.path(OUT_DIR, "hmdd_lists.txt")
   # ── Section 4: Full reference table ─────────────────────────────────────
   cat("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
   cat("SECTION 4 — FULL CANDIDATE TABLE (reference)\n")
-  cat("  Format: miRNA | direction | best_padj | best_log2FC | in_Responder | in_NonResponder\n")
+  cat("  Format: miRNA | direction | best_padj | best_log2FC | contrast\n")
   cat("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
-  fmt <- "  %-35s  %-5s  %10s  %9s  %-12s  %-15s\n"
-  cat(sprintf(fmt, "miRNA", "dir", "best_padj", "log2FC", "in_Responder", "in_NonResponder"))
+  fmt <- "  %-35s  %-5s  %10s  %9s  %-30s\n"
+  cat(sprintf(fmt, "miRNA", "dir", "best_padj", "log2FC", "contrast"))
   cat(sprintf(fmt, paste(rep("-", 35), collapse=""),
-              "-----", "----------", "---------", "------------", "---------------"))
+              "-----", "----------", "---------", paste(rep("-", 30), collapse="")))
   for (i in seq_len(nrow(all_cand))) {
     r <- all_cand[i, ]
     cat(sprintf(fmt,
@@ -239,8 +235,7 @@ out_txt <- file.path(OUT_DIR, "hmdd_lists.txt")
                 r$direction,
                 formatC(r$best_padj, format = "e", digits = 2),
                 formatC(r$best_lfc,  format = "f", digits = 3),
-                if (r$in_Resp) "YES" else "—",
-                if (r$in_NonR) "YES" else "—"))
+                r$contrast))
   }
   cat("\n")
 
@@ -251,10 +246,7 @@ log_msg("Saved: hmdd_lists.txt")
 
 # ── write machine-readable CSV ────────────────────────────────────────────────
 readr::write_csv(
-  all_cand %>% select(miRNA, miRNA_hmdd, direction, best_padj, best_lfc,
-                      log2FoldChange_Resp, padj_Resp,
-                      log2FoldChange_NonR, padj_NonR,
-                      in_Resp, in_NonR),
+  all_cand %>% select(miRNA, miRNA_hmdd, direction, best_padj, best_lfc, contrast),
   file.path(OUT_DIR, "hmdd_mirna_table.csv")
 )
 log_msg("Saved: hmdd_mirna_table.csv")

@@ -22,6 +22,7 @@ Output:
 
 import sys
 import os
+import re
 import json
 import base64
 import io
@@ -88,6 +89,34 @@ def _lb_img(path, alt, style="width:100%;border-radius:6px"):
             f'title="Click to enlarge" style="{style}">')
 
 
+# ── Recursive locators (outputs may live at the dataset root or nested) ───────
+
+def find_dir(parent, name):
+    """Return the shallowest directory called `name` found under `parent`, else None."""
+    best = None
+    best_depth = None
+    for root, dirs, _ in os.walk(parent):
+        if name in dirs:
+            cand = os.path.join(root, name)
+            depth = cand.count(os.sep)
+            if best is None or depth < best_depth:
+                best, best_depth = cand, depth
+    return best
+
+
+def find_file(parent, basename):
+    """Return the shallowest file called `basename` found under `parent`, else None."""
+    best = None
+    best_depth = None
+    for root, _, files in os.walk(parent):
+        if basename in files:
+            cand = os.path.join(root, basename)
+            depth = cand.count(os.sep)
+            if best is None or depth < best_depth:
+                best, best_depth = cand, depth
+    return best
+
+
 # ── Discovery ─────────────────────────────────────────────────────────────────
 
 def discover_all(parent_dir):
@@ -100,15 +129,21 @@ def discover_all(parent_dir):
     comparisons = []
     default_dir = None
 
-    for folder_name in sorted(os.listdir(parent_dir)):
-        folder_path = os.path.join(parent_dir, folder_name)
-        if not os.path.isdir(folder_path):
-            continue
-        if not folder_name.startswith("DEA_"):
-            continue
+    # Collect all DEA_* folders recursively
+    dea_folders = []
+    for root, dirs, _ in os.walk(parent_dir):
+        for folder_name in sorted(dirs):
+            if folder_name.startswith("DEA_"):
+                dea_folders.append((folder_name, os.path.join(root, folder_name)))
 
-        model = "Default" if "Default" in folder_name else (
-                "Strict"  if "Strict"  in folder_name else folder_name)
+    for folder_name, folder_path in dea_folders:
+
+        if "Strict" in folder_name or "No_Outlier" in folder_name:
+            model = "Strict"
+        elif "Default" in folder_name or "Outlier_Replacement_On" in folder_name:
+            model = "Default"
+        else:
+            model = folder_name
 
         if model == "Default" and default_dir is None:
             default_dir = folder_path
@@ -155,9 +190,17 @@ def discover_all(parent_dir):
                 "dispersion_path": disp_path,
             })
 
-    # QC folder
-    qc_dir = os.path.join(parent_dir, "figures_and_QC")
-    qc = {"dir": qc_dir if os.path.isdir(qc_dir) else None}
+    # Fallback: if no "Default" folder found, use first available dea folder
+    if default_dir is None and dea_folders:
+        default_dir = dea_folders[0][1]
+
+    # QC folder — search recursively
+    qc_dir = None
+    for root, dirs, _ in os.walk(parent_dir):
+        if "figures_and_QC" in dirs:
+            qc_dir = os.path.join(root, "figures_and_QC")
+            break
+    qc = {"dir": qc_dir}
     if qc["dir"]:
         for fname, attr in (("PCA_plot.png", "pca"),
                             ("UMAP_plot.png", "umap"),
@@ -185,26 +228,27 @@ def discover_all(parent_dir):
 
 # ── Loaders for downstream analyses ──────────────────────────────────────────
 
-def load_kegg(d):
-    p = os.path.join(d, "pathway_outputs", "KEGG_Enrichment_Results.csv")
-    return pd.read_csv(p) if d and os.path.exists(p) else None
+def load_kegg(pathway_dir):
+    if not pathway_dir: return None
+    p = os.path.join(pathway_dir, "KEGG_Enrichment_Results.csv")
+    return pd.read_csv(p) if os.path.exists(p) else None
 
 
-def load_go(d):
-    # Read ALL rows: clusterProfiler writes GO results grouped by ontology, with
-    # BP first. A previous nrows cap silently dropped every CC/MF term (the file
-    # leads with >2000 BP rows), so the CC/MF tabs had no data and never switched.
-    p = os.path.join(d, "pathway_outputs", "GO_Enrichment_Results.csv")
-    return pd.read_csv(p) if d and os.path.exists(p) else None
+def load_go(pathway_dir):
+    if not pathway_dir: return None
+    p = os.path.join(pathway_dir, "GO_Enrichment_Results.csv")
+    return pd.read_csv(p) if os.path.exists(p) else None
 
 
-def load_multimir(d):
-    p = os.path.join(d, "multimir_outputs", "targets_validated_summary_by_miRNA.csv")
-    return pd.read_csv(p) if d and os.path.exists(p) else None
+def load_multimir(multimir_dir):
+    if not multimir_dir: return None
+    p = os.path.join(multimir_dir, "targets_validated_summary_by_miRNA.csv")
+    return pd.read_csv(p) if os.path.exists(p) else None
 
 
-def count_targets(d):
-    p = os.path.join(d, "multimir_outputs", "validated_target_genes_unique.csv")
+def count_targets(multimir_dir):
+    if not multimir_dir: return 0
+    p = os.path.join(multimir_dir, "validated_target_genes_unique.csv")
     try:
         return len(pd.read_csv(p))
     except Exception:
@@ -216,27 +260,31 @@ def load_clinical(parent_dir):
     Discover clinical_outputs/ produced by clinical_roc.R, hmdd_prep.R,
     and ibd_target_overlap.R.  Returns None if the folder doesn't exist.
     """
-    clin_dir = os.path.join(parent_dir, "clinical_outputs")
-    if not os.path.isdir(clin_dir):
-        return None
-
-    result = {"dir": clin_dir}
-    for fname, key in (
+    # Files are produced by stages 17/18/19 and may live in clinical_outputs/,
+    # ibd_overlap_outputs/, or hmdd_outputs/ — locate each by name recursively.
+    file_map = (
         ("roc_R_vs_NR.csv",       "roc_rvsnr"),
         ("roc_UC_vs_HC.csv",      "roc_uchc"),
         ("cv_model_R_vs_NR.csv",  "cv_model"),
         ("candidate_mirnas.csv",  "candidates"),
         ("ibd_target_overlap.csv","ibd_overlap"),
         ("hmdd_mirna_table.csv",  "hmdd_table"),
-    ):
-        p = os.path.join(clin_dir, fname)
+    )
+    found = {key: find_file(parent_dir, fname) for fname, key in file_map}
+    if not any(found.values()):
+        return None
+
+    result = {"dir": parent_dir}
+    for key, p in found.items():
         try:
-            result[key] = pd.read_csv(p) if os.path.exists(p) else None
+            result[key] = pd.read_csv(p) if p else None
         except Exception:
             result[key] = None
 
-    fig_dir = os.path.join(clin_dir, "figures")
-    result["fig_dir"] = fig_dir if os.path.isdir(fig_dir) else None
+    # Clinical ROC figures (stage 17) live in a clinical_outputs/figures folder
+    clin_dir = find_dir(parent_dir, "clinical_outputs")
+    fig_dir = os.path.join(clin_dir, "figures") if clin_dir else None
+    result["fig_dir"] = fig_dir if fig_dir and os.path.isdir(fig_dir) else None
 
     if result["fig_dir"]:
         def _pngs(prefix):
@@ -249,10 +297,12 @@ def load_clinical(parent_dir):
         result["roc_uchc_pngs"]  = _pngs("ROC_UCvsHC_")
         result["violin_pngs"]    = _pngs("violin_")
         result["roc_multi"]      = os.path.join(fig_dir, "ROC_multi_RvsNR.png")
-        result["ibd_fig"]        = os.path.join(fig_dir, "ibd_enrichment.png")
     else:
         result.update({"roc_rvsnr_pngs": [], "roc_uchc_pngs": [],
-                        "violin_pngs": [], "roc_multi": None, "ibd_fig": None})
+                        "violin_pngs": [], "roc_multi": None})
+
+    # IBD enrichment figure lives in ibd_overlap_outputs/figures/ (stage 19)
+    result["ibd_fig"] = find_file(parent_dir, "ibd_enrichment.png")
     return result
 
 
@@ -910,8 +960,8 @@ img.lb{cursor:zoom-in;border-radius:6px;display:block}
 <!-- HEADER -->
 <div class="hdr">
   <h1>miRNA Differential Expression Analysis</h1>
-  <p class="sub">Dataset: <strong>PRJNA471862</strong> &ensp;&mdash;&ensp; IBD: Ulcerative Colitis</p>
-  <p class="sub2">Results Round 2 &nbsp;&middot;&nbsp; Generated <<<DATE>>></p>
+  <p class="sub">Dataset: <strong><<<DATASET>>></strong> &ensp;&mdash;&ensp; IBD miRNA-seq</p>
+  <p class="sub2">Generated <<<DATE>>></p>
 </div>
 
 <div class="wrap">
@@ -1041,7 +1091,7 @@ img.lb{cursor:zoom-in;border-radius:6px;display:block}
 </div><!-- /wrap -->
 
 <div class="footer">
-  miRNA-seq Pipeline &nbsp;&middot;&nbsp; IBD Project &nbsp;&middot;&nbsp; PRJNA471862<br>
+  miRNA-seq Pipeline &nbsp;&middot;&nbsp; IBD Project &nbsp;&middot;&nbsp; <<<DATASET>>><br>
   DESeq2 + apeglm + multiMiR + clusterProfiler + vis.js
 </div>
 
@@ -1075,36 +1125,54 @@ const IBD_DATA    = <<<IBD_JSON>>>;
 const CFG = {responsive:true, displaylogo:false,
              modeBarButtonsToRemove:['select2d','lasso2d','autoScale2d']};
 
-/* ===== INIT CHARTS ===== */
-Plotly.newPlot('plt-overview', OVERVIEW.data, OVERVIEW.layout, CFG);
+/* ===== INIT CHARTS =====
+   Wrapped so that a CDN/Plotly failure or a single bad chart can NEVER abort
+   the rest of the script — tab switching and the image lightbox are defined
+   below and must always work, even offline. */
+const GO_ORDER = ['BP','CC','MF'];
 
-const compKeys = Object.keys(ALL_COMPS);
-if (compKeys.length) {
-  const first = ALL_COMPS[compKeys[0]];
-  Plotly.newPlot('plt-volcano', first.volcano.data, first.volcano.layout, CFG);
-  Plotly.newPlot('plt-lfc',     first.lfc.data,     first.lfc.layout,     CFG);
+function plot(id, fig) {
+  try {
+    if (typeof Plotly === 'undefined') return;
+    if (fig && fig.data) Plotly.newPlot(id, fig.data, fig.layout, CFG);
+  } catch (e) { console.error('Plotly init failed for', id, e); }
 }
 
-if (KEGG_DATA && KEGG_DATA.data) Plotly.newPlot('plt-kegg',     KEGG_DATA.data, KEGG_DATA.layout, CFG);
-if (KEGG_DOT  && KEGG_DOT.data)  Plotly.newPlot('plt-kegg-dot', KEGG_DOT.data,  KEGG_DOT.layout,  CFG);
-if (MULTIMIR  && MULTIMIR.data)  Plotly.newPlot('plt-multimir', MULTIMIR.data,  MULTIMIR.layout,  CFG);
+function initAllCharts() {
+  plot('plt-overview', OVERVIEW);
 
-if (ROC_RVSNR && ROC_RVSNR.data && ROC_RVSNR.data.length) Plotly.newPlot('plt-roc-rvsnr', ROC_RVSNR.data, ROC_RVSNR.layout, CFG);
-if (ROC_UCHC  && ROC_UCHC.data  && ROC_UCHC.data.length)  Plotly.newPlot('plt-roc-uchc',  ROC_UCHC.data,  ROC_UCHC.layout,  CFG);
-if (IBD_DATA  && IBD_DATA.data  && IBD_DATA.data.length)   Plotly.newPlot('plt-ibd',        IBD_DATA.data,  IBD_DATA.layout,  CFG);
+  const compKeys = Object.keys(ALL_COMPS);
+  if (compKeys.length) {
+    const first = ALL_COMPS[compKeys[0]];
+    plot('plt-volcano', first.volcano);
+    plot('plt-lfc',     first.lfc);
+  }
 
-/* GO tabs — init both dotplot and bar chart */
-const GO_ORDER = ['BP','CC','MF'];
-(function(){
-  for (const o of GO_ORDER) {
-    if (GO_DOT[o])  { Plotly.newPlot('plt-go-dot', GO_DOT[o].data,  GO_DOT[o].layout,  CFG); break; }
-  }
-})();
-(function(){
-  for (const o of GO_ORDER) {
-    if (GO_DATA[o]) { Plotly.newPlot('plt-go',     GO_DATA[o].data, GO_DATA[o].layout, CFG); break; }
-  }
-})();
+  plot('plt-kegg',     KEGG_DATA);
+  plot('plt-kegg-dot', KEGG_DOT);
+  plot('plt-multimir', MULTIMIR);
+  if (ROC_RVSNR && ROC_RVSNR.data && ROC_RVSNR.data.length) plot('plt-roc-rvsnr', ROC_RVSNR);
+  if (ROC_UCHC  && ROC_UCHC.data  && ROC_UCHC.data.length)  plot('plt-roc-uchc',  ROC_UCHC);
+  if (IBD_DATA  && IBD_DATA.data  && IBD_DATA.data.length)   plot('plt-ibd',       IBD_DATA);
+
+  for (const o of GO_ORDER) { if (GO_DOT[o])  { plot('plt-go-dot', GO_DOT[o]); break; } }
+  for (const o of GO_ORDER) { if (GO_DATA[o]) { plot('plt-go',     GO_DATA[o]); break; } }
+}
+
+if (typeof Plotly === 'undefined') {
+  /* CDN blocked or no internet — interactive charts cannot render, but the rest
+     of the report (tables, static PNG figures with zoom) still works. */
+  const b = document.createElement('div');
+  b.style.cssText = 'background:#fff3cd;color:#664d03;border:1px solid #ffe69c;'
+    + 'padding:12px 16px;margin:0 0 18px;border-radius:8px;font-size:.92em';
+  b.innerHTML = '⚠️ Interactive charts could not load because the Plotly '
+    + 'library (cdn.plot.ly) was unreachable. Static figures, tables, tab switching '
+    + 'and image zoom still work. Reconnect to the internet and reload to see the charts.';
+  const wrap = document.querySelector('.wrap') || document.body;
+  wrap.insertBefore(b, wrap.firstChild);
+} else {
+  initAllCharts();
+}
 
 /* Shared GO state */
 let _goOnto = 'BP', _goView = 'dot';
@@ -1310,14 +1378,12 @@ def build_dispersion(comparisons, model):
     return _missing("Dispersion plot not found")
 
 
-def build_network_section(default_dir, parent_dir):
-    if not default_dir:
-        return "", ""
+def build_network_section(net_dir, parent_dir):
+    if not net_dir:
+        return _missing("Network dashboard files not found — run 16_interactive_network.R first"), ""
 
-    # Relative paths from the HTML file (which lives in parent_dir)
-    default_rel = os.path.relpath(default_dir, parent_dir).replace("\\", "/")
-    net_rel     = f"{default_rel}/network_outputs"
-    net_dir     = os.path.join(default_dir, "network_outputs")
+    # Relative path from the HTML file (which lives in parent_dir)
+    net_rel = os.path.relpath(net_dir, parent_dir).replace("\\", "/")
 
     # Working interactive dashboards (vis-network "auto-freeze" tripartite views)
     # produced by 16_interactive_network.R — one per enrichment ontology.
@@ -1339,7 +1405,7 @@ def build_network_section(default_dir, parent_dir):
     if not links:
         links = _missing("Network dashboard files not found — run 16_interactive_network.R first")
 
-    tri_path = os.path.join(default_dir, "network_outputs", "Tripartite_Network_Plot.png")
+    tri_path = os.path.join(net_dir, "Tripartite_Network_Plot.png")
     tri_html = ""
     if os.path.exists(tri_path):
         b64 = _file_b64(tri_path)
@@ -1567,6 +1633,10 @@ def main():
     parent_dir = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.getcwd())
     print(f"Results dir : {parent_dir}")
 
+    # Derive a dataset label from the folder name (e.g. "a_PRJNA331127" -> "PRJNA331127")
+    m = re.search(r"(PRJ[A-Z]{2}\d+|GSE\d+)", os.path.basename(parent_dir), re.I)
+    dataset_label = m.group(1) if m else os.path.basename(parent_dir)
+
     # Discover
     comparisons, qc, default_dir = discover_all(parent_dir)
     if not comparisons:
@@ -1574,13 +1644,18 @@ def main():
     print(f"  Found {len(comparisons)} comparison(s): "
           + ", ".join(c['label'] for c in comparisons))
 
-    # Load downstream (from Default folder)
-    if default_dir:
-        print(f"  Downstream analyses from: {os.path.basename(default_dir)}")
-    kegg_df     = load_kegg(default_dir)
-    go_df       = load_go(default_dir)
-    multimir_df = load_multimir(default_dir)
-    n_targets   = count_targets(default_dir)
+    # Locate downstream output folders anywhere under the dataset root.
+    # Stages 14/15/16/19 write to the dataset root (getwd()), not into the DEA folder.
+    pathway_dir  = find_dir(parent_dir, "pathway_outputs")
+    multimir_dir = find_dir(parent_dir, "multimir_outputs")
+    network_dir  = find_dir(parent_dir, "network_outputs")
+    for label, d in (("pathway", pathway_dir), ("multimir", multimir_dir), ("network", network_dir)):
+        print(f"  {label}_outputs : {os.path.relpath(d, parent_dir) if d else 'not found'}")
+
+    kegg_df     = load_kegg(pathway_dir)
+    go_df       = load_go(pathway_dir)
+    multimir_df = load_multimir(multimir_dir)
+    n_targets   = count_targets(multimir_dir)
 
     print("  Clinical analysis …")
     clin_data   = load_clinical(parent_dir)
@@ -1688,15 +1763,15 @@ def main():
     multimir_content = ('<div id="plt-multimir"></div>' if multimir_df is not None
                         else _missing("multiMiR results not found — run stage 14 first"))
 
-    net_links, tri_img = build_network_section(default_dir, parent_dir)
+    net_links, tri_img = build_network_section(network_dir, parent_dir)
 
     # Dotplots (embedded with lightbox)
     kegg_dotplot = _lb_img(
-        os.path.join(default_dir, "pathway_outputs", "KEGG_Dotplot.png")
-        if default_dir else None, "KEGG Dotplot")
+        os.path.join(pathway_dir, "KEGG_Dotplot.png")
+        if pathway_dir else None, "KEGG Dotplot")
     go_dotplot = _lb_img(
-        os.path.join(default_dir, "pathway_outputs", "GO_Dotplot.png")
-        if default_dir else None, "GO Dotplot")
+        os.path.join(pathway_dir, "GO_Dotplot.png")
+        if pathway_dir else None, "GO Dotplot")
 
     # Stat cards
     n_samples_str = str(qc.get("n_samples", "—"))
@@ -1705,7 +1780,7 @@ def main():
     # Assemble HTML
     html = (
         _TEMPLATE
-        .replace("<<<DATASET>>>",        "PRJNA471862")
+        .replace("<<<DATASET>>>",        dataset_label)
         .replace("<<<DATE>>>",           datetime.now().strftime("%Y-%m-%d %H:%M"))
         .replace("<<<N_TOTAL>>>",        n_total_str)
         .replace("<<<N_COMPS>>>",        str(len(comparisons)))

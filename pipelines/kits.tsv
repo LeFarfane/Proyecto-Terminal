@@ -1,0 +1,19 @@
+# Per-dataset library-prep kit map.
+# The kit is a property of the GEO/SRA study (every run in a study uses one prep),
+# so it is assigned here from the published methods, NOT auto-detected from reads.
+#
+# Known kit names (see pipelines/lib/kit_params.sh for the param mapping):
+#   illumina      TruSeq / standard Illumina small RNA  -> -a illumina, no UMI
+#   nextflex_v3   NEXTflex Small RNA-Seq v3             -> -a illumina + -umi 4,4 (4+4 random-mers)
+#   nebnext       NEBNext small RNA                     -> -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC, no UMI
+#
+# Any dataset not listed here defaults to "illumina".
+#
+# dataset_id	kit
+a_PRJNA471862	illumina
+ar_PRJNA717018	illumina
+d_GSE114603	illumina
+d_GSE270662	nextflex_v3
+d_GSE272890	illumina
+n_PRJNA331127	illumina
+n_PRJNA471862	illumina

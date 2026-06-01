@@ -17,6 +17,16 @@ THREADS="${THREADS:-6}"
 PARALLEL="${PARALLEL:-1}"
 FASTQ_DIR="${FASTQ_DIR:-.}"
 
+# Resolve the library-prep kit -> miRge adapter/UMI params (see ../kits.tsv).
+# Set KIT=... explicitly, or DATASET=<id> to look it up. Defaults to illumina.
+#   KIT=nextflex_v3 ./10_single_folder_mirge3.sh runs.txt
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/kit_params.sh
+source "$SCRIPT_DIR/../lib/kit_params.sh"
+KIT="$(resolve_kit)"
+load_kit_params "$KIT"
+echo "Kit: $KIT  ->  miRge -a $MIRGE_ADAPTER ${MIRGE_UMI_ARGS[*]:-(no UMI)}" >&2
+
 if [[ -z "$LIST" || ! -f "$LIST" ]]; then
   echo "Usage: $0 runs.txt" >&2
   exit 1
@@ -78,7 +88,8 @@ run_one() {
     -cpu "$THREADS" \
     -o "$run_dir" \
     -spl \
-    -a illumina \
+    -a "$MIRGE_ADAPTER" \
+    ${MIRGE_UMI_ARGS[@]+"${MIRGE_UMI_ARGS[@]}"} \
     -nxt 20 \
     -q 20 \
     -NX \

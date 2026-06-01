@@ -50,7 +50,7 @@ P = {
 }
 
 # ── Layout constants ──────────────────────────────────────────────────────────
-FW, FH = 16, 24          # figure inches
+FW, FH = 16, 27          # figure inches
 BOX_W  = 7.2             # main stage box width
 BOX_H  = 1.05            # main stage box height
 CX     = 4.6             # centre-x of main pipeline
@@ -68,27 +68,27 @@ FS_STAGE = 8.5           # stage number font size
 #   We'll use ax.transData with xlim/ylim matching figure units.
 
 STAGES_Y = {
-    "header":  22.6,
-    "db":      21.2,
-    "s00":     19.4,
-    "d_s00":   18.25,   # data label after s00
-    "s01":     17.3,
-    "d_s01":   16.15,
-    "s02":     15.2,
-    "d_s02":   14.05,
-    "s03":     13.1,
-    "d_s03":   11.95,
-    "s04":     11.0,
-    "d_s04":    9.85,
-    "s05":      8.9,
-    "d_s05":    7.75,
-    "s06":      6.8,
-    "d_s06":    5.65,
-    "s07a":     4.7,
-    "d_s07a":   3.55,
-    "s07b":     2.6,
-    "d_s07b":   1.5,
-    "report":   0.45,
+    "header":  25.6,
+    "db":      24.2,
+    "s00":     22.4,
+    "d_s00":   21.25,   # data label after s00
+    "s01":     20.3,
+    "d_s01":   19.15,
+    "s02":     18.2,
+    "d_s02":   17.05,
+    "s03":     16.1,
+    "d_s03":   14.95,
+    "s04":     14.0,
+    "d_s04":   12.85,
+    "s05":     11.9,
+    "d_s05":   10.75,
+    "s06":      9.8,
+    "d_s06":    8.65,
+    "s07a":     7.7,
+    "d_s07a":   6.55,
+    "s07b":     5.6,
+    "d_s07b":   4.5,
+    "report":   3.45,
 }
 
 
@@ -213,11 +213,11 @@ def draw():
     # ── Background sections ───────────────────────────────────────────────────
     # Colour-tinted bands per pipeline section
     sections = [
-        (22.0, 19.9, "#EBF5FB", "DATA ACQUISITION"),  # blue tint
-        (19.9, 13.7, "#E8F8F5", "SEQUENCING PROCESSING"),  # green tint
-        ( 9.5, 13.7, "#F5EEF8", "STATISTICAL ANALYSIS"),   # purple tint
-        ( 1.0,  9.5, "#FEF5E7", "BIOLOGICAL INTERPRETATION"),  # orange tint
-        ( 0.0,  1.0, "#EBF5FB", "REPORTING"),
+        (25.0, 22.9, "#EBF5FB", "DATA ACQUISITION"),  # blue tint
+        (22.9, 16.7, "#E8F8F5", "SEQUENCING PROCESSING"),  # green tint
+        (12.5, 16.7, "#F5EEF8", "STATISTICAL ANALYSIS"),   # purple tint
+        ( 4.0, 12.5, "#FEF5E7", "BIOLOGICAL INTERPRETATION"),  # orange tint
+        ( 3.0,  4.0, "#EBF5FB", "REPORTING"),
     ]
     for y_top, y_bot, fc, label in sections:
         h = y_top - y_bot
@@ -290,7 +290,7 @@ def draw():
     stage_box(ax, CX, STAGES_Y["s03"], BOX_W, BOX_H,
               "03", "miRNA Quantification",
               ["miRge3.0", "miRBase hsa"],
-              ["08_test_auto_mirge3_subfolders.sh", "09_single_end_runs_mirge3.sh"],
+              ["09_auto_subfolders_mirge3.sh", "10_single_folder_mirge3.sh"],
               P["s03"])
 
     data_box(ax, CX, STAGES_Y["d_s03"], DATA_W + 1.0, DATA_H,
@@ -354,13 +354,13 @@ def draw():
 
     # ── Stage 07b ─────────────────────────────────────────────────────────────
     stage_box(ax, CX, STAGES_Y["s07b"], BOX_W, BOX_H,
-              "07b", "Network Construction & Clinical Evaluation",
-              ["igraph", "clusterProfiler", "pROC", "Louvain"],
-              ["build_network.R", "clinical_eval.R", "16_interactive_network.R"],
+              "07b", "Network, Clinical & Database Validation",
+              ["igraph", "pROC", "OpenTargets", "HMDD / miRNet"],
+              ["16_network.R", "17_tr_response_roc.R", "18_hmdd_prep.R", "19_ibd_overlap.R"],
               P["s07b"])
 
     data_box(ax, CX, STAGES_Y["d_s07b"], DATA_W + 1.4, DATA_H,
-             "miRNA–gene network  ·  ROC/AUC  ·  centrality scores")
+             "network HTML  ·  ROC/AUC curves  ·  HMDD lists  ·  IBD overlap")
     arrow(ax, CX, STAGES_Y["s07b"] - BOX_H / 2, CX, STAGES_Y["d_s07b"] + DATA_H / 2)
     arrow(ax, CX, STAGES_Y["d_s07b"] - DATA_H / 2,
           CX, STAGES_Y["report"] + BOX_H / 2 + 0.05)
@@ -369,15 +369,15 @@ def draw():
     stage_box(ax, CX, STAGES_Y["report"], BOX_W, BOX_H,
               "08", "Automated HTML Report  &  Interactive Dashboard",
               ["Plotly.js", "vis.js", "matplotlib"],
-              ["17_generate_report.py", "16_interactive_network.R"],
+              ["20_generate_report.py", "16_interactive_network.R"],
               P["rep"])
 
     # ── Literature Mining module ───────────────────────────────────────────────
     lit_ys = [
-        (20.8, "PubMed Search\npt_search.py · PubMed_API_0.1.py"),
-        (19.1, "Paper Retrieval\n& Deduplication\nrefineria.py"),
-        (17.3, "Local TF-IDF\nSearch Engine\ninteractive_cli.py"),
-        (15.6, "Filtered corpus\n(papers.csv / .jsonl)"),
+        (23.8, "PubMed Search\nsearch_engine_papers/"),
+        (22.1, "Paper Retrieval\n& Deduplication"),
+        (20.3, "Local Search Engine\n& Corpus Indexing"),
+        (18.6, "Filtered corpus\n(papers.csv / .jsonl)"),
     ]
 
     for i, (ly, label) in enumerate(lit_ys):
@@ -409,17 +409,17 @@ def draw():
             "context", fontsize=7, color="#AAB7B8", ha="center", style="italic")
 
     # Literature module label
-    ax.text(LIT_X, 21.6, "Literature Mining\nModule",
+    ax.text(LIT_X, 24.6, "Literature Mining\nModule",
             ha="center", va="center", fontsize=9, fontweight="bold",
             color=P["lit"], multialignment="center")
-    ax.annotate("", xy=(LIT_X, 21.3), xytext=(LIT_X, 21.25),
+    ax.annotate("", xy=(LIT_X, 24.3), xytext=(LIT_X, 24.25),
                 arrowprops=dict(arrowstyle="-", color=P["lit"], lw=1))
 
     # Bracket around literature module
     bx = LIT_X - LIT_W / 2 - 0.15
-    ax.plot([bx, bx], [15.1, 21.8], color="#BDC3C7", lw=1.2, zorder=1)
-    ax.plot([bx, bx + 0.15], [15.1, 15.1], color="#BDC3C7", lw=1.2, zorder=1)
-    ax.plot([bx, bx + 0.15], [21.8, 21.8], color="#BDC3C7", lw=1.2, zorder=1)
+    ax.plot([bx, bx], [18.1, 24.8], color="#BDC3C7", lw=1.2, zorder=1)
+    ax.plot([bx, bx + 0.15], [18.1, 18.1], color="#BDC3C7", lw=1.2, zorder=1)
+    ax.plot([bx, bx + 0.15], [24.8, 24.8], color="#BDC3C7", lw=1.2, zorder=1)
 
     # ── Legend ────────────────────────────────────────────────────────────────
     leg_items = [

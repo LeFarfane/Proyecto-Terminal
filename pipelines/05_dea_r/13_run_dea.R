@@ -6,25 +6,47 @@
 cat("\n=====================================================\n")
 cat("      DESeq2 Automated miRNA Pipeline\n")
 cat("=====================================================\n")
-cat("Which metadata column would you like to analyze?\n")
-cat(" (Type 'disease' or 'group' and press Enter): ")
 
-input_col <- readLines(file("stdin"), n = 1)
-condition_col <- trimws(input_col)
-
-if (condition_col == "") {
-  cat(" -> No input detected. Defaulting to 'disease'.\n")
-  condition_col <- "disease"
-} else {
-  cat(paste(" -> Selected:", condition_col, "\n"))
+find_file <- function(name) {
+  hits <- list.files(".", pattern = paste0("^", name, "$"), recursive = TRUE, full.names = TRUE)
+  if (length(hits) == 0) stop(paste("Cannot find", name, "— run from the dataset root directory."))
+  if (length(hits) > 1) cat(paste("[WARN] Multiple matches for", name, "— using first:", hits[1], "\n"))
+  hits[1]
 }
+counts_csv  <- find_file("Master_Filtered_Counts_DESeq2.csv")
+meta_csv    <- find_file("sample_metadata.csv")
 
-counts_csv  <- "Master_Filtered_Counts_DESeq2.csv"
-meta_csv    <- "sample_metadata.csv"
+# Read metadata early so we can show real column options
+meta_preview <- read.csv(meta_csv, stringsAsFactors = FALSE, nrows = 0)
+candidate_cols <- colnames(meta_preview)[colnames(meta_preview) != "sample_id"]
 
-results_dir_strict  <- "./results/DEA_No_Outlier_Replacement"
-results_dir_default <- "./results/DEA_Outlier_Replacement_On"
-fig_dir             <- "./results/figures_and_QC"
+cat("Available metadata columns:\n")
+for (i in seq_along(candidate_cols)) {
+  cat(sprintf("  [%d] %s\n", i, candidate_cols[i]))
+}
+cat("\nWhich column would you like to analyze? (type name or number): ")
+
+input_col <- trimws(readLines(file("stdin"), n = 1))
+
+# Accept number or name
+if (grepl("^[0-9]+$", input_col)) {
+  idx <- as.integer(input_col)
+  if (idx >= 1 && idx <= length(candidate_cols)) {
+    condition_col <- candidate_cols[idx]
+  } else {
+    stop(paste("Invalid selection:", input_col))
+  }
+} else if (input_col == "") {
+  condition_col <- candidate_cols[1]
+  cat(paste(" -> No input detected. Defaulting to:", condition_col, "\n"))
+} else {
+  condition_col <- input_col
+}
+cat(paste(" -> Selected:", condition_col, "\n"))
+
+results_dir_strict  <- "./DEA_results/DEA_No_Outlier_Replacement"
+results_dir_default <- "./DEA_results/DEA_Outlier_Replacement_On"
+fig_dir             <- "./DEA_results/figures_and_QC"
 
 for (d in c(results_dir_strict, results_dir_default, fig_dir)) if (!dir.exists(d)) dir.create(d, recursive = TRUE)
 
@@ -40,28 +62,30 @@ counts <- read.csv(counts_csv, row.names = 1, check.names = FALSE)
 meta   <- read.csv(meta_csv, stringsAsFactors = FALSE)
 
 if (!(condition_col %in% colnames(meta))) {
-  stop(paste("Error: Column '", condition_col, "' not found in your metadata file!"))
+  stop(paste("Column '", condition_col, "' not found. Available:", paste(colnames(meta), collapse = ", ")))
 }
 
 # --- STANDARDIZE & SHORTEN METADATA LABELS ---
 raw_conditions <- meta[[condition_col]]
 
 clean_conditions <- sapply(raw_conditions, function(x) {
-  if (grepl("non-responder", x, ignore.case = TRUE)) {
-    return("UC_NonResponder")
-  } else if (grepl("good response|treatment-responders", x, ignore.case = TRUE)) {
-    return("UC_Responder")
-  } else if (grepl("healthy control", x, ignore.case = TRUE)) {
+  if (grepl("^NC$|healthy.control|normal.control", x, ignore.case = TRUE)) {
     return("HealthyControl")
-  } else if (grepl("ulcerative colitis", x, ignore.case = TRUE)) {
+  } else if (grepl("^UC$|ulcerative.colitis", x, ignore.case = TRUE)) {
     return("UlcerativeColitis")
+  } else if (grepl("non-responder", x, ignore.case = TRUE)) {
+    return("UC_NonResponder")
+  } else if (grepl("good.response|treatment.responder", x, ignore.case = TRUE)) {
+    return("UC_Responder")
+  } else if (grepl("^IlealCD$|ileal.crohn|crohn", x, ignore.case = TRUE)) {
+    return("IlealCD")
   } else {
-    return(make.names(substr(x, 1, 20))) 
+    return(make.names(substr(x, 1, 20)))
   }
 })
 
 meta$Condition <- clean_conditions
-control_label  <- "HealthyControl" 
+control_label  <- "HealthyControl"
 
 # Align columns and rows
 a <- colnames(counts)

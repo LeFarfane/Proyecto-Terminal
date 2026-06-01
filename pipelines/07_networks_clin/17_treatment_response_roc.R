@@ -52,14 +52,48 @@ get_script_dir <- function() {
 SCRIPT_DIR <- tryCatch(get_script_dir(), error = function(e) normalizePath(getwd()))
 ROOT_DIR   <- normalizePath(file.path(SCRIPT_DIR, "..", ".."))
 
-# ── fixed paths ──────────────────────────────────────────────────────────────
-DEA_BASE    <- file.path(ROOT_DIR, "outputs", "a_PRJNA471862", "fastq",
-                         "muestras_clasificadas", "DEA_results_round_2")
-VST_PATH    <- file.path(DEA_BASE, "figures_and_QC", "vst_normalized_matrix.csv")
-META_PATH   <- file.path(ROOT_DIR, "outputs", "a_PRJNA471862", "fastq",
-                         "muestras_clasificadas", "sample_metadata.csv")
-DEA_RESP    <- file.path(DEA_BASE, "DEA_Default_Replace", "DEA_Default_UC_Responder.csv")
-DEA_NONR    <- file.path(DEA_BASE, "DEA_Default_Replace", "DEA_Default_UC_NonResponder.csv")
+# ── paths — resolved from optional arg or auto-discovered ────────────────────
+# Usage:  Rscript 17_treatment_response_roc.R [DEA_results_round_2_path]
+# If no argument is given the script searches under ROOT_DIR/outputs/ for a
+# DEA_results_round_2 directory that contains the required files.
+args_trail <- commandArgs(trailingOnly = TRUE)
+
+find_dea_base <- function(search_root) {
+  # Returns all DEA_results_round_2 dirs under search_root that contain the
+  # required VST matrix (proof the full pipeline ran there).
+  hits <- list.files(search_root, pattern = "^DEA_results_round_2$",
+                     recursive = TRUE, full.names = TRUE, include.dirs = TRUE)
+  hits <- hits[file.info(hits)$isdir %in% TRUE]
+  # Keep only those with the VST matrix present
+  hits[sapply(hits, function(h)
+    file.exists(file.path(h, "figures_and_QC", "vst_normalized_matrix.csv")))]
+}
+
+if (length(args_trail) >= 1 && nzchar(args_trail[1])) {
+  DEA_BASE <- normalizePath(args_trail[1], mustWork = FALSE)
+} else {
+  # 1st priority: search from the current working directory (user is already
+  #               inside the right dataset folder when they run the script)
+  hits <- find_dea_base(getwd())
+
+  # 2nd priority: search the whole outputs/ tree
+  if (length(hits) == 0) hits <- find_dea_base(file.path(ROOT_DIR, "outputs"))
+
+  if (length(hits) == 0)
+    stop("Cannot find a valid DEA_results_round_2 (with vst_normalized_matrix.csv). ",
+         "Pass the path explicitly as argument 1.")
+  if (length(hits) > 1)
+    cat(sprintf("[WARN] Multiple valid DEA_results_round_2 found — using: %s\n", hits[1]))
+
+  DEA_BASE <- hits[1]
+}
+
+# Derive sibling paths from DEA_BASE
+MUESTRAS_DIR <- dirname(DEA_BASE)                     # …/muestras_clasificadas
+VST_PATH     <- file.path(DEA_BASE,      "figures_and_QC", "vst_normalized_matrix.csv")
+META_PATH    <- file.path(MUESTRAS_DIR,  "sample_metadata.csv")
+DEA_RESP     <- file.path(DEA_BASE, "DEA_Default_Replace", "DEA_Default_UC_Responder.csv")
+DEA_NONR     <- file.path(DEA_BASE, "DEA_Default_Replace", "DEA_Default_UC_NonResponder.csv")
 
 OUT_DIR     <- file.path(DEA_BASE, "clinical_outputs")
 FIG_DIR     <- file.path(OUT_DIR, "figures")
@@ -73,12 +107,20 @@ write("", file = LOGFILE)
 
 # ── thresholds ────────────────────────────────────────────────────────────────
 PADJ_THRESH     <- 0.05
-LFC_THRESH      <- 1.0
+LFC_THRESH      <- 0.58
 TOP_ROC_PLOTS   <- 6
 TOP_VIOLIN      <- 12
 TOP_MODEL       <- 5
 CV_FOLDS        <- 5
 set.seed(42)
+
+cat("\n=====================================================\n")
+cat("  NOTE: This script only applies to datasets with\n")
+cat("  treatment-response data (responders vs non-responders\n")
+cat("  at baseline). Auto-discovers DEA_results_round_2 under\n")
+cat("  outputs/, or pass the path as argument 1.\n")
+cat("  Skip this step for simple case-control datasets.\n")
+cat("=====================================================\n\n")
 
 log_msg("clinical_roc.R starting")
 log_msg("ROOT_DIR : ", ROOT_DIR)

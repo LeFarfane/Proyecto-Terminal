@@ -5,12 +5,32 @@
             "color": "foldercolorizer.color_ff5f00"
         },
         {
-            "folderPath": "Pipelines\\outputs\\a_PRJNA331127\\",
-            "color": "foldercolorizer.color_ff8700"
+            "folderPath": "Pipelines\\outputs\\d_GSE114603\\",
+            "color": "foldercolorizer.color_ffafff"
         },
         {
-            "folderPath": "Pipelines\\outputs\\f_PRJNA471862\\",
+            "folderPath": "Pipelines\\outputs\\n_PRJNA331127",
+            "color": "foldercolorizer.color_afff5f"
+        },
+        {
+            "folderPath": "Pipelines\\outputs\\n_PRJNA471862",
             "color": "foldercolorizer.color_87af00"
+        },
+        {
+            "folderPath": "Pipelines\\outputs\\a_PRJNA471862\\",
+            "color": "foldercolorizer.color_87afff"
+        },
+        {
+            "folderPath": "Pipelines\\outputs\\ar_PRJNA717018\\",
+            "color": "foldercolorizer.color_87afff"
+        },
+        {
+            "folderPath": "Pipelines\\outputs\\d_GSE270662\\",
+            "color": "foldercolorizer.color_af0000"
+        },
+        {
+            "folderPath": "Pipelines\\outputs\\d_GSE272890\\",
+            "color": "foldercolorizer.color_ffffff"
         }
     ]
 }

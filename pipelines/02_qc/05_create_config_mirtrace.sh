@@ -1,8 +1,18 @@
 #!/bin/bash
 
-# 1. Define your adapter sequence (Update this if yours is different!)
-# This is the standard Illumina Small RNA adapter
-ADAPTER="TGGAATTCTCGGGTGCCAAGG"
+# 1. Pick the 3' adapter from the dataset's library-prep kit (see ../kits.tsv).
+#    Set the kit explicitly with KIT=..., or let it resolve from DATASET=<id>.
+#    Examples:
+#      KIT=nextflex_v3 ./05_create_config_mirtrace.sh
+#      DATASET=d_GSE270662 ./05_create_config_mirtrace.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/kit_params.sh
+source "$SCRIPT_DIR/../lib/kit_params.sh"
+
+KIT="$(resolve_kit)"
+load_kit_params "$KIT"
+ADAPTER="$MIRTRACE_ADAPTER"
+echo "Kit: $KIT  ->  miRTrace adapter: $ADAPTER"
 
 # 2. Define the output filename
 OUTPUT="mirtrace_config.csv"

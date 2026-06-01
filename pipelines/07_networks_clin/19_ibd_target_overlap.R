@@ -35,14 +35,20 @@ get_script_dir <- function() {
   normalizePath(getwd())
 }
 SCRIPT_DIR <- tryCatch(get_script_dir(), error = function(e) normalizePath(getwd()))
-ROOT_DIR   <- normalizePath(file.path(SCRIPT_DIR, "..", ".."))
 
-DEA_BASE       <- file.path(ROOT_DIR, "outputs", "a_PRJNA471862", "fastq",
-                             "muestras_clasificadas", "DEA_results_round_2")
-MULTIMIR_DIR   <- file.path(DEA_BASE, "DEA_Default_Replace", "multimir_outputs")
-VAL_TARGETS    <- file.path(MULTIMIR_DIR, "targets_validated.csv")
-OUT_DIR        <- file.path(DEA_BASE, "clinical_outputs")
-FIG_DIR        <- file.path(OUT_DIR, "figures")
+# Run from the dataset root directory — finds files recursively
+RUN_DIR  <- normalizePath(getwd())
+
+find_file <- function(name) {
+  hits <- list.files(RUN_DIR, pattern = paste0("^", name, "$"), recursive = TRUE, full.names = TRUE)
+  if (length(hits) == 0) stop(paste("Cannot find", name, "— run from the dataset root directory."))
+  if (length(hits) > 1) log_msg("WARN: multiple matches for ", name, " — using first: ", hits[1])
+  hits[1]
+}
+
+VAL_TARGETS <- find_file("targets_validated.csv")
+OUT_DIR     <- file.path(RUN_DIR, "ibd_overlap_outputs")
+FIG_DIR     <- file.path(OUT_DIR, "figures")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 
 PADJ_THRESH    <- 0.05       # Fisher's FDR threshold for reporting
@@ -59,10 +65,7 @@ suppressWarnings(suppressMessages({
 }))
 
 # ── 1. Load validated targets ─────────────────────────────────────────────────
-if (!file.exists(VAL_TARGETS)) {
-  log_msg("ERROR: not found: ", VAL_TARGETS); quit(status = 1)
-}
-log_msg("Reading validated targets ...")
+log_msg("Reading validated targets: ", VAL_TARGETS)
 val <- read.csv(VAL_TARGETS, stringsAsFactors = FALSE)
 
 # Keep only columns we need

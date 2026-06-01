@@ -31,7 +31,7 @@ sink(LOGFILE, append = FALSE, split = TRUE)
 args <- commandArgs(trailingOnly = TRUE)
 dea_input    <- if (length(args) >= 1 && nzchar(args[[1]])) args[[1]] else RUN_DIR
 padj_cut     <- if (length(args) >= 2 && nzchar(args[[2]])) as.numeric(args[[2]]) else 0.05
-lfc_cut      <- if (length(args) >= 3 && nzchar(args[[3]])) as.numeric(args[[3]]) else 1.0
+lfc_cut      <- if (length(args) >= 3 && nzchar(args[[3]])) as.numeric(args[[3]]) else 0.58
 s_score_cut  <- if (length(args) >= 4 && nzchar(args[[4]])) as.numeric(args[[4]]) else 3.0
 org_code     <- if (length(args) >= 5 && nzchar(args[[5]])) args[[5]] else "hsa" 
 
@@ -51,7 +51,7 @@ suppressWarnings(suppressMessages({
 # --- Helpers ---
 list_dea_files <- function(path_or_file) {
   if (file.exists(path_or_file) && file.info(path_or_file)$isdir) {
-    fs <- list.files(path_or_file, pattern = "^DEA_.*\\.csv$", full.names = TRUE)
+    fs <- list.files(path_or_file, pattern = "^DEA_.*\\.csv$", full.names = TRUE, recursive = TRUE)
   } else if (file.exists(path_or_file)) {
     fs <- path_or_file
   } else {

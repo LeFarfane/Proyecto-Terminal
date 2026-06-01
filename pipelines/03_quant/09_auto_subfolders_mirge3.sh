@@ -6,6 +6,16 @@ set -euo pipefail
 
 THREADS=6
 
+# Resolve the library-prep kit -> miRge adapter/UMI params (see ../kits.tsv).
+# Set KIT=... explicitly, or DATASET=<id> to look it up. Defaults to illumina.
+#   KIT=nextflex_v3 ./09_auto_subfolders_mirge3.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/kit_params.sh
+source "$SCRIPT_DIR/../lib/kit_params.sh"
+KIT="$(resolve_kit)"
+load_kit_params "$KIT"
+echo "Kit: $KIT  ->  miRge -a $MIRGE_ADAPTER ${MIRGE_UMI_ARGS[*]:-(no UMI)}"
+
 # Function from your script to cleanly extract the sample name
 get_run_id() {
   local f="$1"
@@ -72,7 +82,8 @@ for child_dir in */; do
         -cpu "$THREADS" \
         -o "$out_dir" \
         -spl \
-        -a illumina \
+        -a "$MIRGE_ADAPTER" \
+        ${MIRGE_UMI_ARGS[@]+"${MIRGE_UMI_ARGS[@]}"} \
         -nxt 20 \
         -q 20 \
         -NX \
