@@ -17,7 +17,7 @@ def main():
     print("your Master Counts file to generate aligned metadata.")
     
     # 1. Ask for the parent directory (This solves the "two levels deep" problem)
-    base_dir = input("\nDrag and drop or paste the Main Dataset Directory here\n(e.g., the a_PRJNA471862 folder) > ").strip()
+    base_dir = input("\nDrag and drop or paste the Main Dataset Directory here\n(e.g., the a_PRJNA471862 folder) or use . for current directory: ").strip()
     
     if not os.path.isdir(base_dir):
         print("\n[!] Error: That directory does not exist. Exiting.")
@@ -56,12 +56,30 @@ def main():
         # Filter
         meta_filtered = runinfo_df[runinfo_df['Run'].isin(sample_ids)].copy()
 
+        # Detect whichever diagnostic column is present and has data
+        DIAG_CANDIDATES = ['disease_status', 'disease_state', 'disease', 'Disease',
+                           'Diagnosis', 'diagnosis', 'disease state', 'isolate', 'subject']
+        col_diag = next(
+            (c for c in DIAG_CANDIDATES
+             if c in runinfo_df.columns and not runinfo_df[c].isna().all()),
+            None
+        )
+        if col_diag is None:
+            print("[!] Warning: no diagnostic column found. Available columns:")
+            print(f"    {list(runinfo_df.columns)}")
+
         # Select columns flexibly (it will keep them if they exist)
-        cols_to_keep = ['Run', 'disease_state', 'group', 'tissue', 'sex', 'age', 'source_name']
+        cols_to_keep = ['Run'] + ([col_diag] if col_diag else []) + ['group', 'inflammation', 'tissue', 'sex', 'age', 'source_name']
         meta_filtered = meta_filtered[[c for c in cols_to_keep if c in meta_filtered.columns]]
 
-        # Rename for DESeq2
-        meta_filtered = meta_filtered.rename(columns={'Run': 'sample_id', 'disease_state': 'disease'})
+        # Rename for DESeq2 — always produce a 'disease' column regardless of source name
+        rename_map = {'Run': 'sample_id'}
+        if col_diag and col_diag != 'disease':
+            rename_map[col_diag] = 'disease'
+        meta_filtered = meta_filtered.rename(columns=rename_map)
+
+        if col_diag:
+            print(f" [+] Diagnostic column: '{col_diag}' -> 'disease'")
 
         # CRITICAL: Enforce column order
         meta_filtered['sample_id'] = pd.Categorical(meta_filtered['sample_id'], categories=sample_ids, ordered=True)
@@ -76,9 +94,12 @@ def main():
 
         print("\n=====================================================")
         print(f"Matched {len(sample_ids)} columns to {len(meta_filtered)} metadata rows.")
-        print("Disease Breakdown:")
-        for disease, count in meta_filtered['disease'].value_counts().items():
-            print(f"  - {disease}: {count}")
+        if 'disease' in meta_filtered.columns:
+            print("Disease Breakdown:")
+            for disease, count in meta_filtered['disease'].value_counts().items():
+                print(f"  - {disease}: {count}")
+        else:
+            print("[!] No disease column in output (no diagnostic column matched).")
         print(f"\n[SUCCESS] Saved perfectly aligned metadata to:")
         print(f" -> {output_path}")
         print("=====================================================\n")

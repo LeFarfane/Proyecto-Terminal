@@ -1,0 +1,28 @@
+# py_env — consolidated upstream pipeline environment (WSL / linux-64)
+# Covers stages 00–04: discovery, download, QC, quantification.
+# All Python/CLI/Java tools live here so you activate ONE env for everything
+# except the R statistical analysis (stages 05–08), which stays in r_env.
+#
+# Rebuild from scratch:
+#     conda env create -f envs/py_env.yml
+# Or update an existing env:
+#     conda env update -n py_env -f envs/py_env.yml
+#
+# Note: miRge3 pins Python 3.8 (EOL) and an older numpy/pandas/scipy — that pin
+# is why this is kept separate from the modern R stack in r_env.yml.
+name: py_env
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - mirge3=0.1.4          # miRNA quantification (stage 03)
+  - mirtrace              # miRNA QC, Java tool (stage 02)
+  - sra-tools>=3          # prefetch / fasterq-dump (stage 01)
+  - entrez-direct         # esearch/elink/efetch (stage 00)
+  - fastqc                # read QC (stage 02)
+  - seqkit                # FASTQ/FASTA utilities
+  - seaborn               # plotting in helper scripts
+# After creating the env, miRge3 needs its reference library (~11 GB) at
+# $CONDA_PREFIX/miRge3_Lib. The pipeline scripts resolve it via $CONDA_PREFIX.

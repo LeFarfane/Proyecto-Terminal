@@ -36,6 +36,25 @@ This increases the request rate limits when running `PubMed_API_0.1.py`.
 
 > **Tip:** crea directorios `data_raw/`, `data_ref/`, `results/` y `outputs/` si no existen, ya que varias etapas los usan por defecto.
 
+#### Entornos conda (WSL / Linux)
+
+El proyecto usa **dos entornos** (los archivos están en `envs/`):
+
+| Entorno | Etapas | Contenido |
+|---|---|---|
+| **`py_env`** | 00–04 | miRge3, miRTrace, sra-tools, entrez-direct, FastQC, seqkit, seaborn (todo lo Python/CLI/Java) |
+| **`r_env`** | 05–08 | R 4.3 + Bioconductor: DESeq2, apeglm, multiMiR, clusterProfiler, enrichplot, org.Hs.eg.db, fgsea, tidyverse, igraph, umap, visNetwork |
+
+```bash
+conda env create -f envs/py_env.yml   # o: conda env update -n py_env -f envs/py_env.yml
+conda env create -f envs/r_env.yml
+```
+
+`py_env` se mantiene separado de `r_env` porque miRge3 fija **Python 3.8**. Activa
+`py_env` para las etapas 00–04 y `r_env` para las etapas 05–08. Los scripts
+resuelven sus rutas (`miRge3_Lib`, `mirtrace.jar`) vía `$CONDA_PREFIX`, así que
+basta con tener el entorno correcto activo.
+
 ---
 
 ### 2. 00_search – Búsqueda y resolución GEO → SRA

@@ -9,7 +9,7 @@
             "color": "foldercolorizer.color_ffafff"
         },
         {
-            "folderPath": "Pipelines\\outputs\\n_PRJNA331127",
+            "folderPath": "Pipelines\\outputs\\n_GSE84779",
             "color": "foldercolorizer.color_afff5f"
         },
         {
@@ -21,16 +21,20 @@
             "color": "foldercolorizer.color_87afff"
         },
         {
-            "folderPath": "Pipelines\\outputs\\ar_PRJNA717018\\",
+            "folderPath": "Pipelines\\outputs\\n_PRJNA717018",
             "color": "foldercolorizer.color_87afff"
         },
         {
-            "folderPath": "Pipelines\\outputs\\d_GSE270662\\",
+            "folderPath": "Pipelines\\outputs\\ignore_GSE270662",
             "color": "foldercolorizer.color_af0000"
         },
         {
+            "folderPath": "Pipelines\\outputs\\n_PRJNA717018\\",
+            "color": "foldercolorizer.color_00af00"
+        },
+        {
             "folderPath": "Pipelines\\outputs\\d_GSE272890\\",
-            "color": "foldercolorizer.color_ffffff"
+            "color": "foldercolorizer.color_0087d7"
         }
     ]
 }

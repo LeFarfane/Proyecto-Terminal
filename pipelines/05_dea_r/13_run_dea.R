@@ -69,7 +69,7 @@ if (!(condition_col %in% colnames(meta))) {
 raw_conditions <- meta[[condition_col]]
 
 clean_conditions <- sapply(raw_conditions, function(x) {
-  if (grepl("^NC$|healthy.control|normal.control", x, ignore.case = TRUE)) {
+  if (grepl("^NC$|^NIBD$|non.?ibd|healthy.control|normal.control", x, ignore.case = TRUE)) {
     return("HealthyControl")
   } else if (grepl("^UC$|ulcerative.colitis", x, ignore.case = TRUE)) {
     return("UlcerativeColitis")

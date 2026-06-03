@@ -1,5 +1,14 @@
 #!/bin/bash
 
+# Auto-navigate to sra_fastq/muestras_clasificadas from the dataset root
+TARGET_DIR="sra_fastq/muestras_clasificadas"
+if [[ ! -d "$TARGET_DIR" ]]; then
+    echo "❌ No se encontró $TARGET_DIR en: $(pwd)"
+    exit 1
+fi
+cd "$TARGET_DIR"
+echo "📂 Trabajando en: $(pwd)"
+
 # Loop through all child folders in the current directory
 for dir in */; do
     # Verify it is actually a directory

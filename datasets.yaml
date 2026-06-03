@@ -1,0 +1,170 @@
+# =============================================================================
+# datasets.yaml  —  Source of truth for the IBD miRNA-seq pipeline
+# =============================================================================
+# This manifest is the single registry of every dataset in the project. It is
+# meant to drive both:
+#   * the orchestrator CLI  (run.py status / run / report)
+#   * the cross-dataset dashboard / master report
+# so that nothing has to be inferred from folder-name prefixes (n_ / d_ / ignore_)
+# ever again.
+#
+# status values:
+#   analyzed     full pipeline complete, Final_Report.html exists
+#   in_progress  download/quant done or running, downstream DEA not finished
+#   suspended    intentionally parked; kept for the record, skipped by runs
+#
+# When adding a dataset: copy a block, fill what you know, set the status.
+# Unknown fields can be left as null — the tooling treats null as "unknown".
+# =============================================================================
+
+project:
+  name: "miRNA-seq meta-analysis of inflammatory bowel disease (IBD)"
+  organism: "Homo sapiens"
+  outputs_root: "outputs"
+  pipeline_root: "pipelines"
+  # Canonical pipeline stages (script directory -> human label). The runner can
+  # use these keys as --from / --to targets.
+  stages:
+    "00_search":         "GEO/SRA discovery & curation"
+    "01_download":       "SRA download (prefetch + fasterq-dump)"
+    "02_qc":             "FastQC / miRTrace QC + sample organization"
+    "03_quant":          "miRNA quantification (miRge3)"
+    "04_merge":          "Count-matrix merge + DESeq2 metadata"
+    "05_dea_r":          "Differential expression (DESeq2)"
+    "06_targets_enrich": "Target prediction (multiMiR) + GO/KEGG enrichment"
+    "07_networks_clin":  "Networks, HMDD, IBD overlap, clinical ROC"
+    "08_report":         "Per-dataset Final_Report.html"
+
+# -----------------------------------------------------------------------------
+datasets:
+
+  # ----- ANALYZED -----------------------------------------------------------
+  - id: GSE84779
+    accession: GSE84779
+    bioproject: PRJNA331127
+    pmid: 27536783
+    status: analyzed
+    output_dir: outputs/n_GSE84779
+    title: >-
+      MicroRNAs expression in the ileal pouch of patients with ulcerative
+      colitis is robustly up-regulated and correlates with disease phenotypes
+    url: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE84779
+    library_strategy: miRNA-Seq
+    library_layout: SINGLE
+    tissue: "ileal mucosa"
+    diseases: [NC, "NP-P", CLDP, IlealCD, UC, "CP-P"]
+    control_label: NC
+    comparisons: [IlealCD, UlcerativeColitis]
+    n_runs_total: 61
+    n_samples_analyzed: 31
+    metadata_csv: outputs/n_GSE84779/sra_fastq/muestras_clasificadas/sample_metadata.csv
+    final_report: outputs/n_GSE84779/Final_Report.html
+
+  - id: PRJNA471862
+    accession: PRJNA471862
+    bioproject: PRJNA471862
+    pmid: null
+    status: analyzed
+    output_dir: outputs/n_PRJNA471862
+    title: >-
+      A systems biology approach identifies ANP32E and other biomarkers of
+      glucocorticoid refractoriness in ulcerative colitis [miRNA-Seq]
+    url: https://www.ncbi.nlm.nih.gov/bioproject/PRJNA471862
+    library_strategy: miRNA-Seq
+    library_layout: SINGLE
+    tissue: "intestinal tissue"
+    diseases: ["healthy controls", "ulcerative colitis"]
+    control_label: "healthy controls"
+    comparisons: [UlcerativeColitis, UC_Responder, UC_NonResponder]
+    n_runs_total: 140
+    n_samples_analyzed: 135
+    metadata_csv: outputs/n_PRJNA471862/fastq/muestras_clasificadas/sample_metadata.csv
+    final_report: outputs/n_PRJNA471862/Final_Report.html
+
+  - id: PRJNA717018
+    accession: PRJNA717018
+    bioproject: PRJNA717018
+    pmid: null
+    status: analyzed
+    output_dir: outputs/n_PRJNA717018
+    title: >-
+      Small RNA-seq of peripheral blood from treatment-naive IBD patients and
+      control individuals (small RNA-Seq I)
+    url: https://www.ncbi.nlm.nih.gov/bioproject/PRJNA717018
+    library_strategy: ncRNA-Seq
+    library_layout: SINGLE
+    tissue: "peripheral blood"
+    diseases: [Control, IlealCD, UlcerativeColitis]
+    control_label: Control
+    comparisons: [IlealCD, UlcerativeColitis]
+    n_runs_total: 205
+    n_samples_analyzed: 140
+    metadata_csv: outputs/n_PRJNA717018/sample_metadata.csv
+    final_report: outputs/n_PRJNA717018/Final_Report.html
+
+  # ----- IN PROGRESS --------------------------------------------------------
+  - id: GSE114603
+    accession: GSE114603
+    bioproject: null
+    pmid: null
+    status: in_progress
+    output_dir: outputs/d_GSE114603
+    title: null   # docs/GSE114603.md is empty — fill metadata when curated
+    url: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE114603
+    library_strategy: null
+    library_layout: SINGLE
+    tissue: null
+    diseases: []
+    control_label: null
+    comparisons: []
+    n_runs_total: null
+    n_samples_analyzed: 140   # fastq stems present; quant/DEA not yet done
+    metadata_csv: null
+    final_report: null
+    notes: >-
+      Also listed in outputs/ignore_list.txt; resurrected and currently being
+      quantified (miRge3). Reconcile the ignore_list entry once a decision is final.
+
+  - id: GSE272890
+    accession: GSE272890
+    bioproject: PRJNA1139190
+    pmid: null
+    status: in_progress
+    output_dir: outputs/d_GSE272890
+    title: >-
+      Myeloid Cell Adhesion Molecule 1 (CADM1) promotes pro-inflammatory
+      signaling during inflammatory bowel disease
+    url: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE272890
+    library_strategy: ncRNA-Seq
+    library_layout: SINGLE
+    tissue: "colon tissue"
+    diseases: [NIBD, UC]
+    control_label: NIBD
+    comparisons: []   # populate after DEA
+    n_runs_total: 102
+    n_samples_analyzed: 102   # fastq stems present; DEA pending
+    metadata_csv: null
+    final_report: null
+
+  # ----- SUSPENDED ----------------------------------------------------------
+  - id: GSE270662
+    accession: GSE270662
+    bioproject: PRJNA1127648
+    pmid: 40067082
+    status: suspended
+    output_dir: outputs/ignore_GSE270662
+    title: >-
+      Characterisation of the regulatory landscape in Crohn's disease reveals
+      miRNA-associated alterations that shape anti-TNF response (CIBER-121)
+    url: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE270662
+    library_strategy: miRNA-Seq
+    library_layout: SINGLE
+    tissue: "terminal ileum / left colon"
+    diseases: ["Crohn's disease"]
+    control_label: null
+    comparisons: []
+    n_runs_total: 119
+    n_samples_analyzed: 60   # partial download before suspension
+    metadata_csv: null
+    final_report: null
+    notes: "Suspended — large payload (~77 GB); kept for the record, skipped by runs."

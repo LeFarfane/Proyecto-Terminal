@@ -81,7 +81,7 @@ run_one() {
   stdbuf -oL -eL miRge3.0 \
     -s "$file" \
     -db miRBase \
-    -lib /home/genesis/miniconda3/envs/mirge3/miRge3_Lib \
+    -lib "${MIRGE3_LIB:-${CONDA_PREFIX:-/home/genesis/miniconda3/envs/py_env}/miRge3_Lib}" \
     -on human \
     -ex 0.1 \
     -ie \

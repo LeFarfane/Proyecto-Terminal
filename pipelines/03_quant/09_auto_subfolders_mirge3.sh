@@ -4,6 +4,23 @@
 
 set -euo pipefail
 
+# Auto-navigate to sra_fastq/muestras_clasificadas from the dataset root
+TARGET_DIR="sra_fastq/muestras_clasificadas"
+if [[ ! -d "$TARGET_DIR" ]]; then
+    echo "❌ No se encontró $TARGET_DIR en: $(pwd)"
+    exit 1
+fi
+
+# Guard: refuse to run from /mnt/ (Windows-mounted drives via WSL drvfs are
+# 10-50x slower for small-I/O workloads like miRge — always run from native Linux fs)
+if [[ "$(pwd)" == /mnt/* ]]; then
+    echo "❌ ERROR: Running from a Windows-mounted drive (/mnt/...) will be extremely slow."
+    echo "   Copy your dataset to the native Linux filesystem (e.g. ~/bioprojects/) and run from there."
+    exit 1
+fi
+cd "$TARGET_DIR"
+echo "📂 Trabajando en: $(pwd)"
+
 THREADS=6
 
 # Resolve the library-prep kit -> miRge adapter/UMI params (see ../kits.tsv).
@@ -28,6 +45,17 @@ get_run_id() {
   echo "$b"
 }
 
+echo "=================================================="
+echo "Scan mode selection:"
+echo "  [1] Full scan   — process ALL .fastq.gz files found in each folder"
+echo "  [2] List mode   — process only files listed in fasta_list.txt (if present)"
+echo "=================================================="
+read -rp "Enter choice [1/2]: " SCAN_CHOICE
+case "$SCAN_CHOICE" in
+  2) SCAN_MODE="list"  ; echo "Mode: list (fasta_list.txt)" ;;
+  *) SCAN_MODE="full"  ; echo "Mode: full scan" ;;
+esac
+
 echo "Starting nested sequential processing..."
 
 # OUTER LOOP: Iterate through all child directories
@@ -46,13 +74,32 @@ for child_dir in */; do
   (
     cd "$child_dir" || exit 1
 
-    # Safely look for .fastq.gz files (prevents errors if none exist)
-    shopt -s nullglob
-    fastq_files=(*.fastq.gz)
-    shopt -u nullglob
+    # Build the file list according to the chosen scan mode
+    if [[ "$SCAN_MODE" == "list" ]]; then
+      if [[ ! -f fasta_list.txt ]]; then
+        echo "    No fasta_list.txt found in $clean_dir. Skipping..."
+        exit 0
+      fi
+      mapfile -t fastq_files < fasta_list.txt
+      # Drop blank lines and entries that don't actually exist
+      valid_files=()
+      for f in "${fastq_files[@]}"; do
+        [[ -z "$f" ]] && continue
+        if [[ -f "$f" ]]; then
+          valid_files+=("$f")
+        else
+          echo "    WARNING: $f listed in fasta_list.txt but not found. Skipping."
+        fi
+      done
+      fastq_files=("${valid_files[@]}")
+    else
+      shopt -s nullglob
+      fastq_files=(*.fastq.gz)
+      shopt -u nullglob
+    fi
 
     if [[ ${#fastq_files[@]} -eq 0 ]]; then
-      echo "    No .fastq.gz files found in $clean_dir. Skipping..."
+      echo "    No .fastq.gz files to process in $clean_dir. Skipping..."
       exit 0 # Exits this folder, outer loop moves to the next one
     fi
 
@@ -75,7 +122,7 @@ for child_dir in */; do
       stdbuf -oL -eL miRge3.0 \
         -s "$file" \
         -db miRBase \
-        -lib /home/genesis/miniconda3/envs/mirge3/miRge3_Lib \
+        -lib "${MIRGE3_LIB:-${CONDA_PREFIX:-/home/genesis/miniconda3/envs/py_env}/miRge3_Lib}" \
         -on human \
         -ex 0.1 \
         -ie \

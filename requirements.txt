@@ -1,6 +1,35 @@
+# ── Python (pip) dependencies ────────────────────────────────────────────────
+# This file lists ONLY the pip-installable Python packages used across the repo.
+#
+# The FULL pipeline toolchain (sra-tools, entrez-direct, FastQC, MultiQC, miRge3,
+# miRTrace, DESeq2 + Bioconductor, etc.) is managed by conda in TWO environments:
+#
+#     envs/py_env.yml   →  stages 00–04  (CLI / Java / Python)
+#     envs/r_env.yml    →  stages 05–08  (R / Bioconductor)
+#
+# Create them with:   conda env create -f envs/py_env.yml
+#                     conda env create -f envs/r_env.yml
+# Verify everything:  bash pipelines/00_search/00_tool_check.sh
+#
+# These Python packages already ship inside py_env; this file is for standalone
+# or Windows use (e.g. the Streamlit dashboard and the PubMed search tool).
+
+# Core data / plotting
 numpy
 pandas
-scikit-learn
 matplotlib
+seaborn
+
+# Literature search engine (pipelines/search_engine_papers/)
+scikit-learn
 networkx
 requests
+
+# Dashboard + manifest (pipelines/08_report/dashboard/, datasets.yaml)
+streamlit
+plotly
+PyYAML
+matplotlib-venn      # Venn diagrams (cross-dataset overlap)
+upsetplot            # UpSet plots (scalable overlap)
+scipy                # Stouffer meta-analysis, Spearman concordance
+statsmodels          # BH multiple-testing correction
