@@ -32,7 +32,7 @@ args <- commandArgs(trailingOnly = TRUE)
 dea_input    <- if (length(args) >= 1 && nzchar(args[[1]])) args[[1]] else RUN_DIR
 padj_cut     <- if (length(args) >= 2 && nzchar(args[[2]])) as.numeric(args[[2]]) else 0.05
 lfc_cut      <- if (length(args) >= 3 && nzchar(args[[3]])) as.numeric(args[[3]]) else 0.58
-s_score_cut  <- if (length(args) >= 4 && nzchar(args[[4]])) as.numeric(args[[4]]) else 3.0
+s_score_cut  <- if (length(args) >= 4 && nzchar(args[[4]])) as.numeric(args[[4]]) else 0   # 0 = no S-score gate; query ALL DE-significant miRNAs (padj/|log2FC| only)
 org_code     <- if (length(args) >= 5 && nzchar(args[[5]])) args[[5]] else "hsa" 
 
 log_line("Starting multimir_targets.R")
@@ -115,15 +115,20 @@ if (nrow(dea_sig) == 0) {
 
 miR_rank <- rank_candidates(dea_sig)
 
-# Apply dynamic threshold instead of top_n
-miR_filtered <- miR_rank %>% filter(max_S_score >= s_score_cut)
+# Query targets for EVERY DE-significant miRNA (padj/|log2FC| already applied in
+# read_dea_sig). S_score is used only for RANKING (rank_candidates orders by it).
+# An explicit s_score_cut > 0 can still prune to a high-confidence subset, but the
+# default (0) keeps the full significant set so the target/enrichment/IBD layers
+# cover all of it — consistent with the project-wide DE definition (0.05 / 0.58).
+miR_filtered <- if (s_score_cut > 0) miR_rank %>% filter(max_S_score >= s_score_cut) else miR_rank
 
 if (nrow(miR_filtered) == 0) {
-  stop(sprintf("No miRNAs passed the dynamic threshold of S_score >= %.2f", s_score_cut))
+  stop("No significant miRNAs to query (check padj / |log2FC| thresholds).")
 }
 
 miR_list <- miR_filtered$miRNA
-log_line(sprintf("Selected miRNAs (S_score >= %.2f): %d candidates", s_score_cut, length(miR_list)))
+log_line(sprintf("Selected miRNAs: %d candidates (s_score_cut=%.2f; 0 = no S-score gate, all DE-significant)",
+                 length(miR_list), s_score_cut))
 
 # --- Split grouped miRNAs (The Smart Slash Fix) ---
 clean_mirnas <- function(mir_vec) {

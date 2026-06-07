@@ -328,6 +328,109 @@ if (nrow(plot_tbl) > 0) {
   log_msg("Saved: figures/ibd_enrichment.png")
 }
 
+# ── 8b. Validated vs Predicted vs Baseline comparison ─────────────────────────
+# Re-run the IDENTICAL Fisher test (same IBD gene list) over the ALL-miRNA
+# baseline target tables produced by 15_multimir_targets_baseline.R, for both
+# validated and predicted evidence, each with its own pooled-target universe.
+# Significant miRNAs (those that fed the canonical analysis above) are flagged so
+# the dashboard can slice the three layers the thesis compares:
+#   validated      = is_significant & evidence == "validated"
+#   non-validated  = is_significant & evidence == "predicted"
+#   baseline       = all miRNAs (the full distribution), either evidence
+# The canonical ibd_target_overlap.csv above is left untouched; this writes a
+# separate ibd_target_overlap_comparison.csv. If the baseline files are missing
+# (script 15 not run yet) the comparison is skipped without failing the run.
+
+find_file_opt <- function(name) {
+  hits <- list.files(RUN_DIR, pattern = paste0("^", name, "$"), recursive = TRUE, full.names = TRUE)
+  if (length(hits) == 0) return(NA_character_)
+  if (length(hits) > 1) log_msg("  comparison: multiple matches for ", name, " — using first: ", hits[1])
+  hits[1]
+}
+
+run_fisher_layer <- function(target_csv, evidence_label, ibd_genes) {
+  if (is.na(target_csv) || !file.exists(target_csv)) {
+    log_msg(sprintf("  comparison: %s baseline targets not found — skipping that layer", evidence_label))
+    return(NULL)
+  }
+  df <- tryCatch(read.csv(target_csv, stringsAsFactors = FALSE), error = function(e) NULL)
+  if (is.null(df) || !nrow(df) || !all(c("mirna", "target_symbol") %in% names(df))) {
+    log_msg(sprintf("  comparison: %s file unusable — skipping that layer", evidence_label))
+    return(NULL)
+  }
+  df <- df %>%
+    filter(!is.na(mirna), nchar(trimws(mirna)) > 0,
+           !is.na(target_symbol), nchar(trimws(target_symbol)) > 0) %>%
+    mutate(mirna = trimws(mirna), target_symbol = trimws(target_symbol)) %>%
+    select(mirna, target_symbol) %>%
+    distinct()
+
+  mt       <- split(df$target_symbol, df$mirna)
+  universe <- unique(df$target_symbol)
+  n_uni    <- length(universe)
+  ibd_uni  <- intersect(ibd_genes, universe)
+  n_ibd    <- length(ibd_uni)
+  n_non    <- n_uni - n_ibd
+  log_msg(sprintf("  comparison [%s]: %d miRNAs, universe=%d genes, IBD-in-universe=%d",
+                  evidence_label, length(mt), n_uni, n_ibd))
+
+  rows <- lapply(names(mt), function(mir) {
+    tg <- unique(mt[[mir]]); nm <- length(tg)
+    if (nm == 0) return(NULL)
+    ov <- intersect(tg, ibd_uni)
+    a  <- length(ov); b <- nm - a; c_ <- n_ibd - a; d <- n_non - b
+    if (a == 0) {
+      return(data.frame(miRNA = mir, evidence = evidence_label, n_targets = nm,
+                        n_ibd_overlap = 0L, pct_ibd = 0, OR = 0, p_fisher = 1,
+                        padj = NA_real_, overlap_genes = NA_character_,
+                        stringsAsFactors = FALSE))
+    }
+    ft <- tryCatch(fisher.test(matrix(c(a, b, c_, d), nrow = 2, ncol = 2),
+                               alternative = "greater"),
+                   error = function(e) NULL)
+    if (is.null(ft)) return(NULL)
+    data.frame(miRNA = mir, evidence = evidence_label, n_targets = nm,
+               n_ibd_overlap = a, pct_ibd = round(100 * a / nm, 2),
+               OR = round(unname(ft$estimate), 3), p_fisher = ft$p.value,
+               padj = NA_real_, overlap_genes = paste(sort(ov), collapse = ";"),
+               stringsAsFactors = FALSE)
+  })
+  tbl <- do.call(rbind, Filter(Negate(is.null), rows))
+  if (is.null(tbl) || !nrow(tbl)) return(NULL)
+  tbl$universe_size   <- n_uni
+  tbl$ibd_in_universe <- n_ibd
+  tbl %>% mutate(padj = p.adjust(p_fisher, method = "BH"))
+}
+
+log_msg("Building validated/predicted/baseline comparison ...")
+base_val  <- find_file_opt("targets_validated_baseline.csv")
+base_pred <- find_file_opt("targets_predicted_baseline.csv")
+
+if (is.na(base_val) && is.na(base_pred)) {
+  log_msg("Baseline target files not found — run 06_targets_enrich/15_multimir_targets_baseline.R "
+          , "first to enable the comparison. Skipping ibd_target_overlap_comparison.csv.")
+} else {
+  cmp <- bind_rows(
+    run_fisher_layer(base_val,  "validated", ibd_genes),
+    run_fisher_layer(base_pred, "predicted", ibd_genes)
+  )
+  if (!is.null(cmp) && nrow(cmp)) {
+    # `val` (loaded at step 1) holds the significant validated targets — its
+    # miRNAs are exactly the candidates that fed the canonical analysis.
+    sig_set <- unique(val$mirna)
+    cmp <- cmp %>%
+      mutate(is_significant = miRNA %in% sig_set) %>%
+      arrange(evidence, padj, desc(OR))
+    out_cmp <- file.path(OUT_DIR, "ibd_target_overlap_comparison.csv")
+    readr::write_csv(cmp, out_cmp)
+    log_msg(sprintf("Saved: ibd_target_overlap_comparison.csv (%d rows; %d significant miRNA-rows; evidence: %s)",
+                    nrow(cmp), sum(cmp$is_significant),
+                    paste(sort(unique(cmp$evidence)), collapse = ", ")))
+  } else {
+    log_msg("Comparison produced no rows — check the baseline target files.")
+  }
+}
+
 # ── 8. Summary ────────────────────────────────────────────────────────────────
 log_msg("\n========== SUMMARY ==========")
 log_msg(sprintf("IBD gene list used    : %d genes  (%s)", length(ibd_genes), source_label))

@@ -11,12 +11,13 @@ if [[ ! -d "$TARGET_DIR" ]]; then
     exit 1
 fi
 
-# Guard: refuse to run from /mnt/ (Windows-mounted drives via WSL drvfs are
-# 10-50x slower for small-I/O workloads like miRge — always run from native Linux fs)
+# Warn (don't block): /mnt/ (Windows-mounted drvfs) is 10-50x slower for miRge's
+# small-I/O workload. Prefer the native Linux fs (e.g. ~/bioprojects/), but allow
+# the user to proceed at their own risk.
 if [[ "$(pwd)" == /mnt/* ]]; then
-    echo "❌ ERROR: Running from a Windows-mounted drive (/mnt/...) will be extremely slow."
-    echo "   Copy your dataset to the native Linux filesystem (e.g. ~/bioprojects/) and run from there."
-    exit 1
+    echo "⚠️  WARNING: Running from a Windows-mounted drive (/mnt/...) — miRge will be"
+    echo "   much slower here. For best speed copy the dataset to the native Linux"
+    echo "   filesystem (e.g. ~/bioprojects/) and run from there. Continuing anyway..."
 fi
 cd "$TARGET_DIR"
 echo "📂 Trabajando en: $(pwd)"
@@ -135,7 +136,6 @@ for child_dir in */; do
         -q 20 \
         -NX \
         -m 18 \
-        -mEC \
         -gff \
         2>&1 | awk -v rid="$run_id" '{ print strftime("[%Y-%m-%d %H:%M:%S]"), "["rid"]", $0 }' | tee "$out_dir/mirge3.log"
       

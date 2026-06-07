@@ -4,7 +4,7 @@
 #    Set the kit explicitly with KIT=..., or let it resolve from DATASET=<id>.
 #    Examples:
 #      KIT=nextflex_v3 ./05_create_config_mirtrace.sh
-#      DATASET=d_GSE270662 ./05_create_config_mirtrace.sh
+#      DATASET=GSE272890 ./05_create_config_mirtrace.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/kit_params.sh
 source "$SCRIPT_DIR/../lib/kit_params.sh"

@@ -202,11 +202,11 @@ run_dea_pipeline <- function(dds, out_dir, run_name) {
     write.csv(res_tbl, file.path(out_dir, paste0("DEA_", run_name, "_", grp, ".csv")), row.names = FALSE)
     
     # Volcano Plot
-    df <- res_tbl %>% mutate(sig = ifelse(!is.na(padj) & padj <= 0.05 & abs(log2FoldChange) >= 1, "sig", "ns"))
+    df <- res_tbl %>% mutate(sig = ifelse(!is.na(padj) & padj <= 0.05 & abs(log2FoldChange) >= 0.58, "sig", "ns"))
     p <- ggplot(df, aes(x = log2FoldChange, y = -log10(padj))) +
       geom_point(aes(alpha = sig, color = sig), size = 1.5) +
       scale_color_manual(values = c("ns" = "grey", "sig" = "red")) +
-      geom_vline(xintercept = c(-1, 1), linetype = "dashed") +
+      geom_vline(xintercept = c(-0.58, 0.58), linetype = "dashed") +
       geom_hline(yintercept = -log10(0.05), linetype = "dashed") +
       theme_minimal() + labs(title = paste(run_name, "-", grp, "vs Control"))
     ggsave(file.path(out_dir, paste0("volcano_", run_name, "_", grp, ".png")), p, width = 7, height = 5)

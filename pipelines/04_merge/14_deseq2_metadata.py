@@ -17,7 +17,7 @@ def main():
     print("your Master Counts file to generate aligned metadata.")
     
     # 1. Ask for the parent directory (This solves the "two levels deep" problem)
-    base_dir = input("\nDrag and drop or paste the Main Dataset Directory here\n(e.g., the a_PRJNA471862 folder) or use . for current directory: ").strip()
+    base_dir = input("\nDrag and drop or paste the Main Dataset Directory here\n(e.g., the PRJNA471862 folder) or use . for current directory: ").strip()
     
     if not os.path.isdir(base_dir):
         print("\n[!] Error: That directory does not exist. Exiting.")

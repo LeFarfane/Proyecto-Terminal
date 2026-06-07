@@ -1633,7 +1633,7 @@ def main():
     parent_dir = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.getcwd())
     print(f"Results dir : {parent_dir}")
 
-    # Derive a dataset label from the folder name (e.g. "a_PRJNA331127" -> "PRJNA331127")
+    # Derive a dataset label from the folder name (e.g. "PRJNA331127", or a legacy "a_PRJNA331127" -> "PRJNA331127")
     m = re.search(r"(PRJ[A-Z]{2}\d+|GSE\d+)", os.path.basename(parent_dir), re.I)
     dataset_label = m.group(1) if m else os.path.basename(parent_dir)
 

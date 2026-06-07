@@ -9,11 +9,9 @@
 #
 # Any dataset not listed here defaults to "illumina".
 #
-# dataset_id	kit
-a_PRJNA471862	illumina
-ar_PRJNA717018	illumina
-d_GSE114603	illumina
-d_GSE270662	nextflex_v3
-d_GSE272890	illumina
-n_PRJNA331127	illumina
-n_PRJNA471862	illumina
+# dataset_id (matches the outputs/<id> folder)	kit
+GSE84779	illumina
+PRJNA471862	illumina
+PRJNA717018	illumina
+GSE114603	illumina
+GSE272890	illumina

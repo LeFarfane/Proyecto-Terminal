@@ -1,40 +1,26 @@
 {
     "folder-color.pathColors": [
         {
-            "folderPath": "Pipelines\\outputs\\a_GSE84779\\",
-            "color": "foldercolorizer.color_ff5f00"
-        },
-        {
-            "folderPath": "Pipelines\\outputs\\d_GSE114603\\",
-            "color": "foldercolorizer.color_ffafff"
-        },
-        {
-            "folderPath": "Pipelines\\outputs\\n_GSE84779",
+            "folderPath": "Pipelines\\outputs\\GSE84779\\",
             "color": "foldercolorizer.color_afff5f"
         },
         {
-            "folderPath": "Pipelines\\outputs\\n_PRJNA471862",
+            "folderPath": "Pipelines\\outputs\\PRJNA471862",
             "color": "foldercolorizer.color_87af00"
         },
         {
-            "folderPath": "Pipelines\\outputs\\a_PRJNA471862\\",
-            "color": "foldercolorizer.color_87afff"
-        },
-        {
-            "folderPath": "Pipelines\\outputs\\n_PRJNA717018",
-            "color": "foldercolorizer.color_87afff"
-        },
-        {
-            "folderPath": "Pipelines\\outputs\\ignore_GSE270662",
-            "color": "foldercolorizer.color_af0000"
-        },
-        {
-            "folderPath": "Pipelines\\outputs\\n_PRJNA717018\\",
+            "folderPath": "Pipelines\\outputs\\PRJNA717018\\",
             "color": "foldercolorizer.color_00af00"
         },
         {
-            "folderPath": "Pipelines\\outputs\\d_GSE272890\\",
+            "folderPath": "Pipelines\\outputs\\GSE114591",
+            "color": "foldercolorizer.color_ffafff"
+        },
+        {
+            "folderPath": "Pipelines\\outputs\\GSE272890\\",
             "color": "foldercolorizer.color_0087d7"
         }
-    ]
+    ],
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": "active"
 }

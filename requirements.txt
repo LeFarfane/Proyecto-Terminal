@@ -16,7 +16,7 @@
 
 # Core data / plotting
 numpy
-pandas
+pandas<3            # upsetplot 0.9.0 (latest) breaks under pandas 3.0 Copy-on-Write; see dashboard/upset_compat.py
 matplotlib
 seaborn
 
