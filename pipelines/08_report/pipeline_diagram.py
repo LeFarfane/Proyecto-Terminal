@@ -266,7 +266,7 @@ def draw():
     stage_box(ax, CX, STAGES_Y["s01"], BOX_W, BOX_H,
               "01", "Raw Data Download",
               ["prefetch", "fasterq-dump", "pigz"],
-              ["03_download_runs.sh"],
+              ["06_download_runs.sh"],
               P["s01"])
 
     data_box(ax, CX, STAGES_Y["d_s01"], DATA_W + 0.6, DATA_H,
@@ -278,7 +278,7 @@ def draw():
     stage_box(ax, CX, STAGES_Y["s02"], BOX_W, BOX_H,
               "02", "Quality Control",
               ["FastQC", "MultiQC", "miRTrace"],
-              ["04_qc_fastqc.sh", "06_qc_mirtrace.sh"],
+              ["07_qc_fastqc.sh", "09_qc_mirtrace.sh"],
               P["s02"])
 
     data_box(ax, CX, STAGES_Y["d_s02"], DATA_W + 0.8, DATA_H,
@@ -290,7 +290,7 @@ def draw():
     stage_box(ax, CX, STAGES_Y["s03"], BOX_W, BOX_H,
               "03", "miRNA Quantification",
               ["miRge3.0", "miRBase hsa"],
-              ["09_auto_subfolders_mirge3.sh", "10_single_folder_mirge3.sh"],
+              ["11_auto_make_list_subfolders.sh", "12_auto_subfolders_mirge3.sh"],
               P["s03"])
 
     data_box(ax, CX, STAGES_Y["d_s03"], DATA_W + 1.0, DATA_H,
@@ -302,7 +302,7 @@ def draw():
     stage_box(ax, CX, STAGES_Y["s04"], BOX_W, BOX_H,
               "04", "Count Merge & Filtering",
               ["pandas", "mean RPM ≥ 100 filter"],
-              ["11_mrina_cut_off.py", "12_deseq2_metadata.py"],
+              ["13_mrina_cut_off.py", "14_deseq2_metadata.py"],
               P["s04"])
 
     data_box(ax, CX, STAGES_Y["d_s04"], DATA_W + 1.4, DATA_H,
@@ -314,7 +314,7 @@ def draw():
     stage_box(ax, CX, STAGES_Y["s05"], BOX_W, BOX_H,
               "05", "Differential Expression Analysis",
               ["DESeq2", "apeglm", "VST", "PCA / UMAP"],
-              ["13_run_dea.R"],
+              ["15_run_dea.R"],
               P["s05"])
 
     # Two outputs from DEA: results + QC figures
@@ -332,7 +332,7 @@ def draw():
     stage_box(ax, CX, STAGES_Y["s06"], BOX_W, BOX_H,
               "06", "Target Prediction",
               ["multiMiR", "miRTarBase", "TarBase", "miRecords"],
-              ["14_multimir_targets.R"],
+              ["16_multimir_targets.R"],
               P["s06"])
 
     data_box(ax, CX, STAGES_Y["d_s06"], DATA_W + 1.6, DATA_H,
@@ -344,7 +344,7 @@ def draw():
     stage_box(ax, CX, STAGES_Y["s07a"], BOX_W, BOX_H,
               "07a", "Pathway Enrichment",
               ["clusterProfiler", "GO", "KEGG"],
-              ["15_pathway_enrich.R"],
+              ["18_pathway_enrich.R"],
               P["s07a"])
 
     data_box(ax, CX, STAGES_Y["d_s07a"], DATA_W + 1.2, DATA_H,
@@ -356,7 +356,7 @@ def draw():
     stage_box(ax, CX, STAGES_Y["s07b"], BOX_W, BOX_H,
               "07b", "Network, Clinical & Database Validation",
               ["igraph", "pROC", "OpenTargets", "HMDD / miRNet"],
-              ["16_network.R", "17_tr_response_roc.R", "18_hmdd_prep.R", "19_ibd_overlap.R"],
+              ["19_interactive_network.R", "20_treatment_response_roc.R", "21_hmdd_prep.R", "22_ibd_target_overlap.R"],
               P["s07b"])
 
     data_box(ax, CX, STAGES_Y["d_s07b"], DATA_W + 1.4, DATA_H,
@@ -369,7 +369,7 @@ def draw():
     stage_box(ax, CX, STAGES_Y["report"], BOX_W, BOX_H,
               "08", "Automated HTML Report  &  Interactive Dashboard",
               ["Plotly.js", "vis.js", "matplotlib"],
-              ["20_generate_report.py", "16_interactive_network.R"],
+              ["23_generate_report.py", "19_interactive_network.R"],
               P["rep"])
 
     # ── Literature Mining module ───────────────────────────────────────────────

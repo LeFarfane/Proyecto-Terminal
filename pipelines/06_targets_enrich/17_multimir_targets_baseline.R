@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ===========================================
-# Script: 15_multimir_targets_baseline.R
-# Description: BASELINE companion to 14_multimir_targets.R.
+# Script: 17_multimir_targets_baseline.R
+# Description: BASELINE companion to 16_multimir_targets.R.
 #              Fetches validated and predicted miRNA->target interactions for
 #              *every* miRNA in the DEA output (NO padj / |log2FC| / S_score
 #              cutoff), so the IBD-overlap comparison has an all-miRNA reference.
@@ -41,7 +41,7 @@ args <- commandArgs(trailingOnly = TRUE)
 dea_input <- if (length(args) >= 1 && nzchar(args[[1]])) args[[1]] else RUN_DIR
 org_code  <- if (length(args) >= 2 && nzchar(args[[2]])) args[[2]] else "hsa"
 
-log_line("Starting 15_multimir_targets_baseline.R")
+log_line("Starting 17_multimir_targets_baseline.R")
 log_line(sprintf("dea_input=%s | org=%s | NO significance cutoff (all DEA miRNAs)",
                  dea_input, org_code))
 
@@ -54,7 +54,7 @@ suppressWarnings(suppressMessages({
   library(multiMiR)
 }))
 
-# --- Helpers (kept identical to 14_multimir_targets.R for consistency) ---
+# --- Helpers (kept identical to 16_multimir_targets.R for consistency) ---
 list_dea_files <- function(path_or_file) {
   if (file.exists(path_or_file) && file.info(path_or_file)$isdir) {
     fs <- list.files(path_or_file, pattern = "^DEA_.*\\.csv$", full.names = TRUE, recursive = TRUE)
@@ -165,7 +165,7 @@ fetch_multimir <- function(mirnas, table_type = c("validated", "predicted"), org
 validated_df <- fetch_multimir(miR_list_clean, table_type = "validated", org = org_code, chunk_size = 20)
 predicted_df <- fetch_multimir(miR_list_clean, table_type = "predicted", org = org_code, chunk_size = 20)
 
-# --- Normalize columns (identical schema to 14_multimir_targets.R) ---
+# --- Normalize columns (identical schema to 16_multimir_targets.R) ---
 norm_validated <- function(df) {
   if (is.null(df) || !nrow(df)) return(tibble())
   nm <- names(df)
@@ -211,5 +211,5 @@ log_line(sprintf("Saved: %s (rows=%d, miRNAs=%d)",
                  out_predicted, nrow(pred_tbl),
                  if (nrow(pred_tbl)) dplyr::n_distinct(pred_tbl$mirna) else 0))
 
-log_line("15_multimir_targets_baseline.R finished successfully.")
+log_line("17_multimir_targets_baseline.R finished successfully.")
 sink()  # close log tee

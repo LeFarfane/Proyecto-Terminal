@@ -185,7 +185,7 @@ with tab_ibd:
         st.divider()
         st.caption("ℹ️ *Validated vs Predicted vs Baseline* comparison not generated "
                    "for this dataset yet. Run `06_targets_enrich/15_multimir_targets_"
-                   "baseline.R` then re-run `07_networks_clin/19_ibd_target_overlap.R`.")
+                   "baseline.R` then re-run `07_networks_clin/22_ibd_target_overlap.R`.")
     elif {"evidence", "is_significant", "OR", "pct_ibd"}.issubset(cmp.columns):
         st.divider()
         st.markdown("#### Validated vs Predicted vs Baseline")
@@ -251,7 +251,7 @@ if clin:
         st.caption(
             "Only for datasets with responder vs non-responder samples at baseline "
             "(here: glucocorticoid response in UC). Per-miRNA ROC/AUC from "
-            "`07_networks_clin/17_treatment_response_roc.R` on the VST matrix, for two "
+            "`07_networks_clin/20_treatment_response_roc.R` on the VST matrix, for two "
             "contrasts: **R vs NR** (can baseline expression predict response?) and "
             "**UC vs HC** (disease vs control). Candidate miRNAs are the union of the "
             "Responder & NonResponder DE-significant sets (padj ≤ 0.05, |log2FC| ≥ 0.58).")

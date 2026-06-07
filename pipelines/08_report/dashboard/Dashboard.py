@@ -3,7 +3,7 @@ IBD miRNA-seq dashboard — Home / Overview.
 
 Run from the repo root with:
     streamlit run pipelines/08_report/dashboard/Dashboard.py
-(or use the 21_launch_dashboard.sh launcher).
+(or use the 24_launch_dashboard.sh launcher).
 """
 import streamlit as st
 

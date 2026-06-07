@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Stage 08 / step 21 — Launch the IBD miRNA-seq Streamlit dashboard (WSL/Linux).
 #
-#   bash 21_launch_dashboard.sh
-#   (or: chmod +x 21_launch_dashboard.sh && ./21_launch_dashboard.sh)
+#   bash 24_launch_dashboard.sh
+#   (or: chmod +x 24_launch_dashboard.sh && ./24_launch_dashboard.sh)
 #
 # Finds a Python interpreter that has Streamlit installed and serves the app at
 # dashboard/Dashboard.py. Tries the project conda envs first, then any python on PATH.

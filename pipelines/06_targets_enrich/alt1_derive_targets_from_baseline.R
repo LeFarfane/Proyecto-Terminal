@@ -1,13 +1,13 @@
 #!/usr/bin/env Rscript
 # =============================================================================
 # Script: derive_targets_from_baseline.R
-# Purpose: Produce the same outputs as 14_multimir_targets.R WITHOUT re-querying
-#          multiMiR. The baseline run (15_multimir_targets_baseline.R) already
+# Purpose: Produce the same outputs as 16_multimir_targets.R WITHOUT re-querying
+#          multiMiR. The baseline run (17_multimir_targets_baseline.R) already
 #          fetched targets for EVERY miRNA with no filter, so the DE-significant
 #          subset is just a filter of those baseline tables — instant, offline,
 #          no risk of overloading / being throttled by the multiMiR server.
 #
-# It writes, into ./multimir_outputs/ (identical schema to 14_multimir_targets.R):
+# It writes, into ./multimir_outputs/ (identical schema to 16_multimir_targets.R):
 #   targets_validated.csv
 #   targets_predicted.csv
 #   targets_validated_summary_by_miRNA.csv
@@ -20,7 +20,7 @@
 #
 # NOTE: assumes the baseline was generated from the CURRENT DEA output. If you
 #       re-ran DESeq2 since the last baseline, regenerate the baseline once
-#       (15_multimir_targets_baseline.R) before using this.
+#       (17_multimir_targets_baseline.R) before using this.
 # =============================================================================
 
 suppressWarnings(suppressMessages({
@@ -45,7 +45,7 @@ dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 log_line("derive_targets_from_baseline.R starting")
 log_line(sprintf("dea_input=%s | padj<=%.3f | |log2FC|>=%.2f", dea_input, padj_cut, lfc_cut))
 
-# --- Helpers (kept identical to 14_multimir_targets.R) ---
+# --- Helpers (kept identical to 16_multimir_targets.R) ---
 list_dea_files <- function(path_or_file) {
   if (file.exists(path_or_file) && file.info(path_or_file)$isdir) {
     fs <- list.files(path_or_file, pattern = "^DEA_.*\\.csv$", full.names = TRUE, recursive = TRUE)
@@ -73,7 +73,7 @@ read_dea_sig <- function(files, padj_cut, lfc_cut) {
   unique(bind_rows(sig)$miRNA)
 }
 
-# The Smart Slash Fix — identical to 14_multimir_targets.R so the names match the
+# The Smart Slash Fix — identical to 16_multimir_targets.R so the names match the
 # baseline tables (the baseline applied the same cleaning before querying).
 clean_mirnas <- function(mir_vec) {
   res <- character()
@@ -111,7 +111,7 @@ log_line(sprintf("DE-significant miRNAs: %d (cleaned/un-slashed: %d)", length(si
 val_base_path  <- file.path(BASELINE_DIR, "targets_validated_baseline.csv")
 pred_base_path <- file.path(BASELINE_DIR, "targets_predicted_baseline.csv")
 if (!file.exists(val_base_path) && !file.exists(pred_base_path)) {
-  stop(sprintf("No baseline tables in %s — run 15_multimir_targets_baseline.R first.", BASELINE_DIR))
+  stop(sprintf("No baseline tables in %s — run 17_multimir_targets_baseline.R first.", BASELINE_DIR))
 }
 read_base <- function(p) if (file.exists(p)) suppressMessages(read_csv(p, col_types = cols(.default = "c"))) else NULL
 val_base  <- read_base(val_base_path)
@@ -139,7 +139,7 @@ pred_tbl <- if (!is.null(pred_base)) {
     select(any_of(pred_cols)) %>% distinct() %>% arrange(mirna, target_symbol, database)
 } else tibble()
 
-# --- 4. Write outputs (identical names/schema to 14_multimir_targets.R) ---
+# --- 4. Write outputs (identical names/schema to 16_multimir_targets.R) ---
 write_csv(val_tbl,  file.path(OUT_DIR, "targets_validated.csv"), na = "")
 write_csv(pred_tbl, file.path(OUT_DIR, "targets_predicted.csv"), na = "")
 log_line(sprintf("Saved targets_validated.csv (rows=%d) and targets_predicted.csv (rows=%d)",

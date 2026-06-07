@@ -203,7 +203,7 @@ def clear_caches() -> None:
 
 
 def _find_conda() -> str | None:
-    """Locate the conda binary the way 21_launch_dashboard.sh does."""
+    """Locate the conda binary the way 24_launch_dashboard.sh does."""
     import shutil
     home = Path.home()
     for c in (home / "miniconda3" / "bin" / "conda",
@@ -422,8 +422,8 @@ def ibd_overlap_table(output_dir: Path) -> pd.DataFrame | None:
 def ibd_overlap_comparison(output_dir: Path) -> pd.DataFrame | None:
     """Validated vs Predicted vs Baseline IBD-overlap comparison for one dataset.
 
-    Produced by 07_networks_clin/19_ibd_target_overlap.R after the all-miRNA
-    baseline targets (06_targets_enrich/15_multimir_targets_baseline.R) exist.
+    Produced by 07_networks_clin/22_ibd_target_overlap.R after the all-miRNA
+    baseline targets (06_targets_enrich/17_multimir_targets_baseline.R) exist.
     One row per (miRNA, evidence) with a shared per-evidence universe:
       evidence ∈ {validated, predicted}; is_significant flags the DE candidates.
     The three thesis layers are slices of this single table:
@@ -457,7 +457,7 @@ def _shallowest_dir(parent: Path, name: str) -> Path | None:
 @lru_cache(maxsize=32)
 def clinical_results(output_dir: Path) -> dict | None:
     """Treatment-response biomarker results for datasets with responder vs
-    non-responder samples at baseline (07_networks_clin/17_treatment_response_roc.R).
+    non-responder samples at baseline (07_networks_clin/20_treatment_response_roc.R).
 
     Most datasets are simple case/control and never run this step — for those this
     returns None (and the dashboard hides the Clinical tab). When present, returns

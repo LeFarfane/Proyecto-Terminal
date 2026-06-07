@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # ===========================================
-# Script: 16_interactive_network.R
+# Script: 19_interactive_network.R
 # Description: Production tripartite miRNA -> Gene -> Pathway/GO dashboards (Cytoscape.js).
 #
 #  v3 — performance + biology + aesthetics overhaul

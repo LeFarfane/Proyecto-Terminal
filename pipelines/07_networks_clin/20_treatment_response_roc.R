@@ -53,7 +53,7 @@ SCRIPT_DIR <- tryCatch(get_script_dir(), error = function(e) normalizePath(getwd
 ROOT_DIR   <- normalizePath(file.path(SCRIPT_DIR, "..", ".."))
 
 # ── paths — resolved from optional arg or auto-discovered ────────────────────
-# Usage:  Rscript 17_treatment_response_roc.R [DEA_results_round_2_path]
+# Usage:  Rscript 20_treatment_response_roc.R [DEA_results_round_2_path]
 # If no argument is given the script searches under ROOT_DIR/outputs/ for a
 # DEA_results_round_2 directory that contains the required files.
 args_trail <- commandArgs(trailingOnly = TRUE)

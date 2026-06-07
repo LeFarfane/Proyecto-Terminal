@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # ===========================================
-# Script: 15_pathway_enrich.R
+# Script: 18_pathway_enrich.R
 # Description: Performs GO (BP, CC, MF) and KEGG pathway enrichment 
 #              on a list of target genes using clusterProfiler.
 #              Features a Smart File Finder for CLI path inputs.
@@ -51,7 +51,7 @@ sink(LOGFILE, append = FALSE, split = TRUE)
 timestamp <- function() format(Sys.time(), "%Y-%m-%d %H:%M:%S")
 log_line <- function(...) cat(sprintf("[%s] %s\n", timestamp(), paste0(..., collapse = "")))
 
-log_line("Starting 15_pathway_enrich.R")
+log_line("Starting 18_pathway_enrich.R")
 log_line(sprintf("Using input file: %s", input_file))
 
 # --- 1. Load Gene List ---

@@ -536,12 +536,12 @@ with tab_cmp:
         "validated vs computationally-predicted targets; **Baseline** = *every* "
         "DEA-tested miRNA (no cutoff) — the reference for an arbitrary miRNA. Built "
         "from each dataset's `ibd_target_overlap_comparison.csv` "
-        "(15_multimir_targets_baseline.R → 19_ibd_target_overlap.R).")
+        "(17_multimir_targets_baseline.R → 22_ibd_target_overlap.R).")
 
     cmp_long = D.ibd_comparison_long()
     if cmp_long.empty:
         st.info("No comparison files found. Run 06_targets_enrich/15_multimir_targets_"
-                "baseline.R then 07_networks_clin/19_ibd_target_overlap.R in each dataset.")
+                "baseline.R then 07_networks_clin/22_ibd_target_overlap.R in each dataset.")
     elif not {"evidence", "is_significant", "OR", "pct_ibd", "padj"}.issubset(cmp_long.columns):
         st.warning("Comparison files are missing expected columns — re-run script 19.")
     else:

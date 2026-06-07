@@ -3,8 +3,8 @@
 # 1. Pick the 3' adapter from the dataset's library-prep kit (see ../kits.tsv).
 #    Set the kit explicitly with KIT=..., or let it resolve from DATASET=<id>.
 #    Examples:
-#      KIT=nextflex_v3 ./05_create_config_mirtrace.sh
-#      DATASET=GSE272890 ./05_create_config_mirtrace.sh
+#      KIT=nextflex_v3 ./08_create_config_mirtrace.sh
+#      DATASET=GSE272890 ./08_create_config_mirtrace.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/kit_params.sh
 source "$SCRIPT_DIR/../lib/kit_params.sh"

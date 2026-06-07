@@ -12,7 +12,7 @@ Downstream analyses (KEGG, GO, multiMiR, network) are read from the first
 Default sub-folder found.
 
 Usage:
-    py -3.11 17_generate_report.py <results_dir>
+    py -3.11 23_generate_report.py <results_dir>
 
     Defaults to current directory if no argument is given.
 
@@ -1380,13 +1380,13 @@ def build_dispersion(comparisons, model):
 
 def build_network_section(net_dir, parent_dir):
     if not net_dir:
-        return _missing("Network dashboard files not found — run 16_interactive_network.R first"), ""
+        return _missing("Network dashboard files not found — run 19_interactive_network.R first"), ""
 
     # Relative path from the HTML file (which lives in parent_dir)
     net_rel = os.path.relpath(net_dir, parent_dir).replace("\\", "/")
 
     # Working interactive dashboards (vis-network "auto-freeze" tripartite views)
-    # produced by 16_interactive_network.R — one per enrichment ontology.
+    # produced by 19_interactive_network.R — one per enrichment ontology.
     kegg_dash   = os.path.join(net_dir, "Automated_Dashboard_KEGG.html")
     go_dash     = os.path.join(net_dir, "Automated_Dashboard_GO.html")
     legacy_dash = os.path.join(net_dir, "Automated_Dashboard.html")
@@ -1403,7 +1403,7 @@ def build_network_section(net_dir, parent_dir):
         links += (f'<a href="{net_rel}/Automated_Dashboard_GO.html" class="btn">'
                   f'🕸 GO Network Dashboard</a>')
     if not links:
-        links = _missing("Network dashboard files not found — run 16_interactive_network.R first")
+        links = _missing("Network dashboard files not found — run 19_interactive_network.R first")
 
     tri_path = os.path.join(net_dir, "Tripartite_Network_Plot.png")
     tri_html = ""

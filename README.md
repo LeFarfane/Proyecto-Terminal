@@ -159,7 +159,7 @@ python pipelines/00_search/05_sync_yaml.py --add-new --confirm
 ### 01_download — SRA run download
 
 ```bash
-bash pipelines/01_download/03_download_runs.sh \
+bash pipelines/01_download/06_download_runs.sh \
   [runinfo.csv|srr_list.txt] [fastq_dir] [fasterq_threads] [parallel_jobs]
 ```
 
@@ -175,16 +175,16 @@ correction (`011_correction_name_samples.sh`) and compression (`012_compress_fas
 
 | Script | Function |
 |---|---|
-| `04_qc_fastqc.sh` | Runs FastQC over all `*.fastq.gz` and consolidates with MultiQC. |
-| `05_create_config_mirtrace.sh` | Generates `mirtrace_config.csv`, picking the 3' adapter from the study's prep kit (see `kits.tsv`). |
-| `06_qc_mirtrace.sh` | Runs miRTrace in batches using the kit's protocol/adapter. |
-| `07_organize_samples.py` | Classifies FASTQ files into `sra_fastq/muestras_clasificadas/` based on the runinfo. |
+| `07_qc_fastqc.sh` | Runs FastQC over all `*.fastq.gz` and consolidates with MultiQC. |
+| `08_create_config_mirtrace.sh` | Generates `mirtrace_config.csv`, picking the 3' adapter from the study's prep kit (see `kits.tsv`). |
+| `09_qc_mirtrace.sh` | Runs miRTrace in batches using the kit's protocol/adapter. |
+| `10_organize_samples.py` | Classifies FASTQ files into `sra_fastq/muestras_clasificadas/` based on the runinfo. |
 
 ```bash
-bash pipelines/02_qc/04_qc_fastqc.sh
-DATASET=GSE272890 bash pipelines/02_qc/05_create_config_mirtrace.sh
-bash pipelines/02_qc/06_qc_mirtrace.sh mirtrace_config.csv
-python pipelines/02_qc/07_organize_samples.py
+bash pipelines/02_qc/07_qc_fastqc.sh
+DATASET=GSE272890 bash pipelines/02_qc/08_create_config_mirtrace.sh
+bash pipelines/02_qc/09_qc_mirtrace.sh mirtrace_config.csv
+python pipelines/02_qc/10_organize_samples.py
 ```
 
 ---
@@ -193,14 +193,14 @@ python pipelines/02_qc/07_organize_samples.py
 
 | Script | Function |
 |---|---|
-| `08_auto_make_list_subfolders.sh` | Builds the list of sample subfolders to process. |
-| `09_auto_subfolders_mirge3.sh` | Safely and sequentially iterates over all subfolders of `muestras_clasificadas/`, running miRge3 one by one. Avoids WSL `/mnt/` paths (much slower). |
+| `11_auto_make_list_subfolders.sh` | Builds the list of sample subfolders to process. |
+| `12_auto_subfolders_mirge3.sh` | Safely and sequentially iterates over all subfolders of `muestras_clasificadas/`, running miRge3 one by one. Avoids WSL `/mnt/` paths (much slower). |
 | `10_single_folder_mirge3.sh` | Processes a single folder / run list; `THREADS`, `PARALLEL`, `FASTQ_DIR` controls. |
 
 ```bash
 # From the dataset root
-bash pipelines/03_quant/08_auto_make_list_subfolders.sh
-bash pipelines/03_quant/09_auto_subfolders_mirge3.sh
+bash pipelines/03_quant/11_auto_make_list_subfolders.sh
+bash pipelines/03_quant/12_auto_subfolders_mirge3.sh
 ```
 
 Per-sample output with `miR.Counts.csv` and `miR.RPM.csv`.
@@ -211,12 +211,12 @@ Per-sample output with `miR.Counts.csv` and `miR.RPM.csv`.
 
 | Script | Function |
 |---|---|
-| `11_mrina_cut_off.py` | Recursively finds the `miR.Counts.csv` / `miR.RPM.csv` files, unifies them into a matrix and filters by **RPM ≥ 100**. Produces `Master_Filtered_Counts_DESeq2.csv`. |
-| `12_deseq2_metadata.py` | Locates the runinfo and the master matrix and generates the aligned `sample_metadata.csv` for DESeq2. |
+| `13_mrina_cut_off.py` | Recursively finds the `miR.Counts.csv` / `miR.RPM.csv` files, unifies them into a matrix and filters by **RPM ≥ 100**. Produces `Master_Filtered_Counts_DESeq2.csv`. |
+| `14_deseq2_metadata.py` | Locates the runinfo and the master matrix and generates the aligned `sample_metadata.csv` for DESeq2. |
 
 ```bash
-python pipelines/04_merge/11_mrina_cut_off.py
-python pipelines/04_merge/12_deseq2_metadata.py
+python pipelines/04_merge/13_mrina_cut_off.py
+python pipelines/04_merge/14_deseq2_metadata.py
 ```
 
 ---
@@ -224,7 +224,7 @@ python pipelines/04_merge/12_deseq2_metadata.py
 ### 05_dea_r — Differential expression (DESeq2)
 
 ```bash
-Rscript pipelines/05_dea_r/13_run_dea.R
+Rscript pipelines/05_dea_r/15_run_dea.R
 ```
 
 - Automatically finds `Master_Filtered_Counts_DESeq2.csv` and `sample_metadata.csv` from
@@ -238,7 +238,7 @@ Rscript pipelines/05_dea_r/13_run_dea.R
 ### 06_targets_enrich — Target prediction (multiMiR)
 
 ```bash
-Rscript pipelines/06_targets_enrich/14_multimir_targets.R [dea_csv_or_dir] [padj] [lfc] [s_score_cut] [org]
+Rscript pipelines/06_targets_enrich/16_multimir_targets.R [dea_csv_or_dir] [padj] [lfc] [s_score_cut] [org]
 # s_score_cut: optional S-score floor for the target query. Default 0 = no gate —
 # query ALL DE-significant miRNAs (padj/|log2FC| only). Pass e.g. 2.0 to restrict.
 ```
@@ -254,18 +254,18 @@ Rscript pipelines/06_targets_enrich/14_multimir_targets.R [dea_csv_or_dir] [padj
 
 | Script | Function |
 |---|---|
-| `15_pathway_enrich.R` | GO (BP/CC/MF) and KEGG enrichment of the target genes with clusterProfiler; *smart file finder* for CLI path inputs. Output in `pathway_outputs/`. |
-| `16_interactive_network.R` | Interactive tripartite miRNA → gene → pathway/GO dashboards (Cytoscape.js). v3: filters to strong *Functional MTI* interactions and a hub-focused view to avoid the "hairball". |
-| `17_treatment_response_roc.R` | Biomarker-performance evaluation (ROC/AUC) of candidate miRNAs: glucocorticoid responders vs non-responders, and UC vs healthy controls. Output in `clinical_outputs/`. |
-| `18_hmdd_prep.R` | Prepares copy-pasteable miRNA lists for **HMDD v4.0** and **miRNet 2.0** and opens both sites in the browser. |
-| `19_ibd_target_overlap.R` | Assesses whether validated targets are enriched in known IBD genes via the **OpenTargets** API (GraphQL) + a per-miRNA Fisher's exact test. |
+| `18_pathway_enrich.R` | GO (BP/CC/MF) and KEGG enrichment of the target genes with clusterProfiler; *smart file finder* for CLI path inputs. Output in `pathway_outputs/`. |
+| `19_interactive_network.R` | Interactive tripartite miRNA → gene → pathway/GO dashboards (Cytoscape.js). v3: filters to strong *Functional MTI* interactions and a hub-focused view to avoid the "hairball". |
+| `20_treatment_response_roc.R` | Biomarker-performance evaluation (ROC/AUC) of candidate miRNAs: glucocorticoid responders vs non-responders, and UC vs healthy controls. Output in `clinical_outputs/`. |
+| `21_hmdd_prep.R` | Prepares copy-pasteable miRNA lists for **HMDD v4.0** and **miRNet 2.0** and opens both sites in the browser. |
+| `22_ibd_target_overlap.R` | Assesses whether validated targets are enriched in known IBD genes via the **OpenTargets** API (GraphQL) + a per-miRNA Fisher's exact test. |
 
 ```bash
-Rscript pipelines/07_networks_clin/15_pathway_enrich.R
-Rscript pipelines/07_networks_clin/16_interactive_network.R
-Rscript pipelines/07_networks_clin/17_treatment_response_roc.R
-Rscript pipelines/07_networks_clin/18_hmdd_prep.R
-Rscript pipelines/07_networks_clin/19_ibd_target_overlap.R
+Rscript pipelines/07_networks_clin/18_pathway_enrich.R
+Rscript pipelines/07_networks_clin/19_interactive_network.R
+Rscript pipelines/07_networks_clin/20_treatment_response_roc.R
+Rscript pipelines/07_networks_clin/21_hmdd_prep.R
+Rscript pipelines/07_networks_clin/22_ibd_target_overlap.R
 ```
 
 ---
@@ -274,13 +274,13 @@ Rscript pipelines/07_networks_clin/19_ibd_target_overlap.R
 
 | Script | Function |
 |---|---|
-| `20_generate_report.py` | Generates a dataset's interactive `Final_Report.html` (Plotly). Auto-discovers the DEA subfolders (Default/Strict) and all comparisons; integrates QC, differential expression, enrichment, networks and IBD overlap. |
-| `21_launch_dashboard.sh` | Launches the Streamlit dashboard (`dashboard/Dashboard.py`). Finds a Python with Streamlit among the project conda environments and serves at `http://localhost:8501`. |
+| `23_generate_report.py` | Generates a dataset's interactive `Final_Report.html` (Plotly). Auto-discovers the DEA subfolders (Default/Strict) and all comparisons; integrates QC, differential expression, enrichment, networks and IBD overlap. |
+| `24_launch_dashboard.sh` | Launches the Streamlit dashboard (`dashboard/Dashboard.py`). Finds a Python with Streamlit among the project conda environments and serves at `http://localhost:8501`. |
 | `pipeline_diagram.py` | Generates the full pipeline diagram for the thesis (`pipeline_diagram.png` at 300 DPI + vector `.pdf`). |
 
 ```bash
-py -3.11 pipelines/08_report/20_generate_report.py <results_dir>
-bash pipelines/08_report/21_launch_dashboard.sh
+py -3.11 pipelines/08_report/23_generate_report.py <results_dir>
+bash pipelines/08_report/24_launch_dashboard.sh
 py -3.11 pipelines/08_report/pipeline_diagram.py
 ```
 

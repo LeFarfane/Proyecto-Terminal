@@ -330,7 +330,7 @@ if (nrow(plot_tbl) > 0) {
 
 # ── 8b. Validated vs Predicted vs Baseline comparison ─────────────────────────
 # Re-run the IDENTICAL Fisher test (same IBD gene list) over the ALL-miRNA
-# baseline target tables produced by 15_multimir_targets_baseline.R, for both
+# baseline target tables produced by 17_multimir_targets_baseline.R, for both
 # validated and predicted evidence, each with its own pooled-target universe.
 # Significant miRNAs (those that fed the canonical analysis above) are flagged so
 # the dashboard can slice the three layers the thesis compares:
@@ -407,7 +407,7 @@ base_val  <- find_file_opt("targets_validated_baseline.csv")
 base_pred <- find_file_opt("targets_predicted_baseline.csv")
 
 if (is.na(base_val) && is.na(base_pred)) {
-  log_msg("Baseline target files not found — run 06_targets_enrich/15_multimir_targets_baseline.R "
+  log_msg("Baseline target files not found — run 06_targets_enrich/17_multimir_targets_baseline.R "
           , "first to enable the comparison. Skipping ibd_target_overlap_comparison.csv.")
 } else {
   cmp <- bind_rows(

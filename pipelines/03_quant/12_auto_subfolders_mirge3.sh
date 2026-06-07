@@ -26,7 +26,7 @@ THREADS=6
 
 # Resolve the library-prep kit -> miRge adapter/UMI params (see ../kits.tsv).
 # Set KIT=... explicitly, or DATASET=<id> to look it up. Defaults to illumina.
-#   KIT=nextflex_v3 ./09_auto_subfolders_mirge3.sh
+#   KIT=nextflex_v3 ./12_auto_subfolders_mirge3.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/kit_params.sh
 source "$SCRIPT_DIR/../lib/kit_params.sh"
