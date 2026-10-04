@@ -15,4 +15,8 @@ PRJNA471862	illumina
 PRJNA717018	illumina
 GSE114603	illumina
 GSE272890	illumina
+# GSE270662: validated 2026-10-04. Methods of PMID 40067082 (PMC12235131) say
+#   "NEXTflex Small RNA-Seq Kit v3" (Bioo #5132-05). Reads agree (SRR29528034,
+#   first 200k): adapter dimers leave an 8-nt insert (20,873 distinct 8-mers),
+#   and let-7a-5p starts at offset 4 in 658/711 hits with 189 distinct 5' 4-mers.
 GSE270662	nextflex_v3
