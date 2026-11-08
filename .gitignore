@@ -4,3 +4,19 @@ __pycache__/
 .venv/
 outputs/*
 !outputs/.gitkeep
+
+# Entornos y configuración local del editor/herramientas
+.conda/
+.claude/
+.idea/
+.vscode/
+.ncbi/
+
+# Notas de trabajo locales (pueden contener hallazgos sensibles)
+.scratch/
+
+# Datos crudos y basura
+*.sra
+*.sra.lock
+*.sra.prf
+devnull
