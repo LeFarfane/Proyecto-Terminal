@@ -369,15 +369,33 @@ def sci_format(*cols: str, fmt: str = "%.2e") -> dict:
     return {c: st.column_config.NumberColumn(format=fmt) for c in cols}
 
 
+def _fmt_md_cell(v) -> str:
+    """Compact, human-readable cell for a Markdown table:
+    integers stay plain, other numbers use 4 significant figures, and very small
+    or very large magnitudes switch to scientific notation (e.g. 5.430e-16,
+    1.085e+06). Non-numeric values pass through (pipes/newlines escaped)."""
+    if pd.isna(v):
+        return ""
+    if isinstance(v, bool):
+        return str(v)
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return str(v).replace("|", "\\|").replace("\n", " ")
+    if f == int(f) and abs(f) < 1e15:      # integer-valued → plain int
+        return str(int(f))
+    a = abs(f)
+    return f"{f:.3e}" if (a < 1e-3 or a >= 1e5) else f"{f:.4g}"
+
+
 def _df_to_markdown(df: pd.DataFrame) -> str:
-    """GitHub/Obsidian-flavoured Markdown table (pipes escaped, newlines flattened)."""
+    """GitHub/Obsidian-flavoured Markdown table. Numbers are rendered compactly
+    (4 sig figs, scientific for tiny/huge values); CSV/TSV keep full precision."""
     cols = [str(c) for c in df.columns]
     lines = ["| " + " | ".join(cols) + " |",
              "| " + " | ".join("---" for _ in cols) + " |"]
     for _, row in df.iterrows():
-        cells = ["" if pd.isna(v) else str(v).replace("|", "\\|").replace("\n", " ")
-                 for v in row]
-        lines.append("| " + " | ".join(cells) + " |")
+        lines.append("| " + " | ".join(_fmt_md_cell(v) for v in row) + " |")
     return "\n".join(lines)
 
 
@@ -558,16 +576,22 @@ def _img_data_uri(path: Path) -> str:
     return "data:image/png;base64," + base64.b64encode(Path(path).read_bytes()).decode()
 
 
-def _lightbox_html(uri: str, caption: str | None, uid: str) -> str:
+def _lightbox_html(uri: str, caption: str | None, uid: str,
+                   max_width: str | None = None) -> str:
     """Inline CSS-only lightbox: click the image to enlarge it to full screen in
     place, click again (anywhere) to close. Uses the :target pseudo-class driven by
     a #hash anchor — the same mechanism as Streamlit's own header anchors — so it
-    works in Chrome (which blocks opening data: URIs in a new tab) with no JS."""
+    works in Chrome (which blocks opening data: URIs in a new tab) with no JS.
+
+    `max_width` (e.g. "520px") caps the inline (non-zoomed) image and centres it, so
+    a small square figure isn't stretched to the full container width — which in the
+    wide layout would balloon its height and leave a big empty band around it."""
     cap = (f'<div style="font-size:.8rem;color:#9aa0a6;text-align:center;'
            f'margin-top:4px">{caption}</div>') if caption else ""
+    box_w = f"max-width:{max_width};margin:0 auto;" if max_width else "margin:0;"
     return f"""
 <style>
-#fig_{uid}{{position:relative;margin:0}}
+#fig_{uid}{{position:relative;{box_w}}}
 #fig_{uid} .zoomi{{width:100%;border-radius:6px;display:block;cursor:zoom-in}}
 #fig_{uid} .zopen{{position:absolute;top:0;left:0;right:0;bottom:0}}
 #fig_{uid} .zclose{{display:none}}
@@ -596,9 +620,14 @@ def zoomable_image(path: Path, caption: str | None = None) -> None:
     st.markdown(_lightbox_html(uri, caption, uid), unsafe_allow_html=True)
 
 
-def zoomable_pyplot(fig, caption: str | None = None) -> None:
+def zoomable_pyplot(fig, caption: str | None = None,
+                    max_width: str | None = "560px") -> None:
     """Click-to-zoom wrapper for an in-memory matplotlib figure (Venn / UpSet):
-    renders it to a PNG, then shows it in the same CSS lightbox as zoomable_image."""
+    renders it to a PNG, then shows it in the same CSS lightbox as zoomable_image.
+
+    `max_width` caps the inline render so a small square figure shows near its native
+    size instead of stretching to the full (wide-layout) container width. Pass None
+    to fill the container."""
     import hashlib
     import io
     import streamlit as st
@@ -607,7 +636,7 @@ def zoomable_pyplot(fig, caption: str | None = None) -> None:
     data = buf.getvalue()
     uri = "data:image/png;base64," + base64.b64encode(data).decode()
     uid = "z" + hashlib.md5(data[:4096]).hexdigest()[:10]
-    st.markdown(_lightbox_html(uri, caption, uid), unsafe_allow_html=True)
+    st.markdown(_lightbox_html(uri, caption, uid, max_width), unsafe_allow_html=True)
 
 
 def open_in_os(path: Path) -> None:
@@ -881,6 +910,82 @@ def mirna_ibd_profile(mirna: str) -> pd.DataFrame:
         hit.insert(0, "dataset", d["id"])
         frames.append(hit)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def _ibd_gene_set(output_dir: Path) -> set:
+    """Set of known IBD gene symbols for a dataset (from ibd_gene_list.csv)."""
+    f = output_dir / "ibd_overlap_outputs" / "ibd_gene_list.csv"
+    if not f.exists():
+        return set()
+    try:
+        df = pd.read_csv(f)
+    except Exception:
+        return set()
+    col = "gene" if "gene" in df.columns else df.columns[0]
+    return set(df[col].astype(str))
+
+
+def mirna_target_profile(mirna: str) -> dict:
+    """Validated + predicted target genes for one miRNA, pooled across analyzed
+    datasets, each row flagged IBD_gene if the target is a known IBD gene.
+
+    Reads each dataset's multimir_outputs/targets_{validated,predicted}.csv (the
+    DE-significant target tables). Returns {'validated': df, 'predicted': df};
+    each df has columns: dataset, target_symbol, database, IBD_gene, + evidence
+    (support_type/experiment/pmid for validated; score_or_rank for predicted).
+    """
+    key = _norm_mirna(mirna)
+    out = {"validated": [], "predicted": []}
+    cols = {
+        "validated": ["dataset", "target_symbol", "database", "IBD_gene",
+                      "support_type", "experiment", "pmid"],
+        "predicted": ["dataset", "target_symbol", "database", "IBD_gene", "score_or_rank"],
+    }
+    for d in analyzed():
+        odir = resolve(d["output_dir"])
+        ibd_genes = _ibd_gene_set(odir)
+        for kind in ("validated", "predicted"):
+            f = odir / "multimir_outputs" / f"targets_{kind}.csv"
+            if not f.exists():
+                continue
+            try:
+                df = pd.read_csv(f, dtype=str)
+            except Exception:
+                continue
+            if "mirna" not in df.columns:
+                continue
+            sub = df[df["mirna"].astype(str).str.lower() == key].copy()
+            if sub.empty:
+                continue
+            sub.insert(0, "dataset", d["id"])
+            sub["IBD_gene"] = sub["target_symbol"].astype(str).isin(ibd_genes)
+            out[kind].append(sub[[c for c in cols[kind] if c in sub.columns]])
+    return {k: (pd.concat(v, ignore_index=True) if v else pd.DataFrame()) for k, v in out.items()}
+
+
+@lru_cache(maxsize=8)
+def dataset_targets(output_dir: Path) -> dict:
+    """Validated + predicted target tables for ONE dataset, each row flagged
+    IBD_gene. Cached because the predicted table can be tens of thousands of rows.
+
+    Returns {'validated': df, 'predicted': df} (DataFrames may be empty).
+    """
+    ibd_genes = _ibd_gene_set(output_dir)
+    out = {}
+    for kind in ("validated", "predicted"):
+        f = output_dir / "multimir_outputs" / f"targets_{kind}.csv"
+        if not f.exists():
+            out[kind] = pd.DataFrame()
+            continue
+        try:
+            df = pd.read_csv(f, dtype=str)
+        except Exception:
+            out[kind] = pd.DataFrame()
+            continue
+        if "target_symbol" in df.columns:
+            df["IBD_gene"] = df["target_symbol"].astype(str).isin(ibd_genes)
+        out[kind] = df
+    return out
 
 
 def list_comparisons(d: dict, mode: str = "Default") -> list[str]:

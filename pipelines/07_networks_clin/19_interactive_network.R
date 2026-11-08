@@ -3,6 +3,20 @@
 # Script: 19_interactive_network.R
 # Description: Production tripartite miRNA -> Gene -> Pathway/GO dashboards (Cytoscape.js).
 #
+#  v4 — evidence tiers + predicted targets + focus genes
+#  ------------------------------------------------
+#  WHAT'S NEW IN v4:
+#   - Three evidence TIERS instead of strong-only: validated-strong (Functional MTI),
+#     validated-weak (Functional MTI (Weak)), and predicted (>= PREDICTED_MIN_DBS tools agree,
+#     read from targets_predicted.csv). Each tier is an independent toggle in the UI; predicted
+#     is off by default. Edge style encodes tier: thick solid (strong), thin solid (weak),
+#     dashed (predicted). "negative" / "Non-Functional MTI" rows remain excluded.
+#   - FOCUS_GENES: genes that ALWAYS enter the graph with their significant-miRNA edges, even
+#     when not a member of any enriched pathway (bypasses the pathway-membership gate). This is
+#     why e.g. ANP32E — absent from KEGG pathways — could not be seen in v3.
+#   - Edge-driven filtering: genes need >= (slider) distinct VISIBLE miRNA edges; orphaned
+#     nodes auto-hide. The degree slider is now tier-aware.
+#
 #  v3 — performance + biology + aesthetics overhaul
 #  ------------------------------------------------
 #  WHY THE REWRITE: v2 built ~2,500 nodes / ~24,000 edges per dashboard because it kept
@@ -39,7 +53,21 @@ OUT_DIR   <- file.path(RUN_DIR, "network_outputs")
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 
 # ── tunable parameters ──────────────────────────────────────────────────────────
-STRONG_SUPPORT      <- c("Functional MTI")  # multiMiR support_type(s) treated as strong
+# Evidence tiers (v4): instead of a single binary "strong-only" filter, interactions are
+# classified into three tiers, each independently toggleable in the dashboard UI:
+#   strong    = multiMiR support_type in STRONG_SUPPORT (robust functional validation)
+#   weak      = multiMiR support_type in WEAK_SUPPORT   (low-throughput / single-report)
+#   predicted = >= PREDICTED_MIN_DBS distinct prediction tools agree (consensus)
+# Rows with support_type "negative" / "Non-Functional MTI" are ALWAYS excluded (refuted).
+STRONG_SUPPORT         <- c("Functional MTI")             # robust validated tier
+WEAK_SUPPORT           <- c("Functional MTI (Weak)")      # weak validated tier
+INCLUDE_WEAK_VALIDATED <- TRUE                            # load the weak validated tier
+INCLUDE_PREDICTED      <- TRUE                            # load predicted (consensus) tier
+PREDICTED_MIN_DBS      <- 2                               # min # prediction tools to keep a predicted pair
+# Genes listed here ALWAYS enter the graph with their significant-miRNA edges, even if they
+# are not members of any enriched pathway (bypasses the pathway-membership gate). Use to
+# spotlight a gene of interest, e.g. c("ANP32E"). Set to character(0) to disable.
+FOCUS_GENES            <- c("ANP32E")
 MAX_PATHWAYS        <- 20                    # cap on enriched terms per dashboard
 MIN_MIRNAS_PER_GENE <- 2                     # default UI slider value (hub view); data keeps >= 1
 HUB_THRESHOLD       <- 3                     # gene targeted by >= this many miRNAs -> "hub" highlight
@@ -47,7 +75,7 @@ LFC_THRESH          <- 0.58
 PADJ_THRESH         <- 0.05
 
 log_line <- function(...) cat(sprintf("[%s] %s\n", format(Sys.time(), "%H:%M:%S"), paste0(..., collapse="")))
-log_line("Starting tripartite dashboard generation (v3, Cytoscape.js)...")
+log_line("Starting tripartite dashboard generation (v4, Cytoscape.js)...")
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 find_file <- function(pattern, dir, required = TRUE) {
@@ -56,7 +84,10 @@ find_file <- function(pattern, dir, required = TRUE) {
     if (required) stop(sprintf("Cannot find file matching: %s", pattern))
     return(NULL)
   }
-  files[1]
+  # Prefer the canonical (shortest-path) copy. Datasets may carry a secondary re-run in a
+  # nested subfolder (e.g. .../DEA_results_round_2/.../multimir_outputs/); taking files[1]
+  # would silently pick that nested copy and desync targets/enrichment from the DEA.
+  files[order(nchar(files))][1]
 }
 
 rescale_range <- function(x, lo, hi) {
@@ -81,6 +112,13 @@ expand_terms <- function(sig_terms) {
 dea_files <- list.files(input_dir, pattern = "^DEA_Default.*\\.csv$",
                         recursive = TRUE, full.names = TRUE)
 if (length(dea_files) == 0) stop(sprintf("No DEA_Default*.csv found under: %s", input_dir))
+# De-duplicate by file name, keeping the canonical (shortest-path) copy. Some datasets carry
+# a secondary DEA re-run in a nested subfolder (e.g. .../DEA_results_round_2/...); without
+# this the recursive search loads both and double-counts contrasts (nDea inflated).
+if (length(dea_files) > 1) {
+  ord <- order(nchar(dea_files))                       # shortest path first = canonical
+  dea_files <- dea_files[ord][!duplicated(basename(dea_files)[ord])]
+}
 log_line(sprintf("  DEA file(s) found: %d — %s",
                  length(dea_files), paste(basename(dea_files), collapse = ", ")))
 
@@ -100,19 +138,79 @@ go_path <- find_file("^GO_Enrichment_Results\\.csv$", input_dir, required = FALS
 go_df   <- if (!is.null(go_path)) read_csv(go_path, show_col_types = FALSE) else NULL
 
 val_df <- as.data.frame(val_df, stringsAsFactors = FALSE)
+val_df <- val_df[!is.na(val_df$target_symbol) & nzchar(val_df$target_symbol), ]
+val_df$pmid <- as.character(val_df$pmid)
 
-# Strong, gene-annotated interactions only
-strong <- val_df[val_df$support_type %in% STRONG_SUPPORT &
-                 !is.na(val_df$target_symbol) & nzchar(val_df$target_symbol), ]
-strong$pmid <- as.character(strong$pmid)
-log_line(sprintf("  Strong-evidence interactions (%s): %d rows / %d unique pairs",
-                 paste(STRONG_SUPPORT, collapse=","), nrow(strong),
-                 nrow(unique(strong[, c("mirna","target_symbol")]))))
+# Predicted targets (optional consensus tier)
+pred_df <- NULL
+if (INCLUDE_PREDICTED) {
+  pred_path <- find_file("^targets_predicted\\.csv$", input_dir, required = FALSE)
+  if (!is.null(pred_path)) {
+    pred_df <- as.data.frame(read_csv(pred_path, show_col_types = FALSE), stringsAsFactors = FALSE)
+    pred_df <- pred_df[!is.na(pred_df$target_symbol) & nzchar(pred_df$target_symbol), ]
+  } else {
+    log_line("  NOTE: INCLUDE_PREDICTED=TRUE but targets_predicted.csv not found — skipping predicted tier.")
+  }
+}
 
-# Evidence depth: # distinct PMIDs per (miRNA, gene)
-strong$key <- paste(strong$mirna, strong$target_symbol, sep = "||")
-ev_pmids   <- tapply(strong$pmid, strong$key,
-                     function(x) length(unique(x[!is.na(x) & nzchar(x)])))
+# ── build unified interaction table with evidence tiers ─────────────────────────
+# Evidence depth metric per (miRNA, gene): # distinct PMIDs for validated tiers.
+pmid_count <- function(df) {
+  if (nrow(df) == 0) return(setNames(integer(0), character(0)))
+  k <- paste(df$mirna, df$target_symbol, sep = "||")
+  tapply(df$pmid, k, function(x) length(unique(x[!is.na(x) & nzchar(x)])))
+}
+strong_v     <- val_df[val_df$support_type %in% STRONG_SUPPORT, ]
+weak_v       <- if (INCLUDE_WEAK_VALIDATED) val_df[val_df$support_type %in% WEAK_SUPPORT, ] else val_df[0, ]
+strong_pmids <- pmid_count(strong_v)
+weak_pmids   <- pmid_count(weak_v)
+
+# Predicted consensus: keep pairs supported by >= PREDICTED_MIN_DBS distinct tools.
+pred_ndb   <- setNames(integer(0), character(0))
+pred_pairs <- NULL
+if (!is.null(pred_df) && nrow(pred_df) > 0) {
+  pk  <- paste(pred_df$mirna, pred_df$target_symbol, sep = "||")
+  ndb <- tapply(pred_df$database, pk, function(x) length(unique(x)))
+  pred_ndb <- ndb[ndb >= PREDICTED_MIN_DBS]
+  if (length(pred_ndb) > 0) {
+    sp <- do.call(rbind, strsplit(names(pred_ndb), "||", fixed = TRUE))
+    pred_pairs <- data.frame(mirna = sp[, 1], gene = sp[, 2],
+                             tier = "predicted", stringsAsFactors = FALSE)
+  }
+}
+
+mk_pairs <- function(df, tier) {
+  if (is.null(df) || nrow(df) == 0) return(NULL)
+  unique(data.frame(mirna = df$mirna, gene = df$target_symbol,
+                    tier = tier, stringsAsFactors = FALSE))
+}
+inter <- do.call(rbind, list(mk_pairs(strong_v, "strong"),
+                             mk_pairs(weak_v, "weak"), pred_pairs))
+inter <- inter[!is.na(inter$gene) & nzchar(inter$gene), ]
+
+# Keep the single highest-priority tier per (miRNA, gene): strong > weak > predicted
+tier_rank  <- c(strong = 3L, weak = 2L, predicted = 1L)
+inter$rank <- tier_rank[inter$tier]
+inter <- inter[order(-inter$rank), ]
+inter <- inter[!duplicated(paste(inter$mirna, inter$gene)), ]
+
+# Evidence count per interaction: PMIDs (validated) or # tools (predicted)
+ev_lookup <- function(mirna, gene, tier) {
+  key <- paste(mirna, gene, sep = "||")
+  out <- integer(length(tier))
+  s <- tier == "strong";    out[s] <- as.integer(strong_pmids[key[s]])
+  w <- tier == "weak";      out[w] <- as.integer(weak_pmids[key[w]])
+  p <- tier == "predicted"; out[p] <- as.integer(pred_ndb[key[p]])
+  out[is.na(out)] <- 1L
+  pmax(1L, out)
+}
+inter$evidence <- ev_lookup(inter$mirna, inter$gene, inter$tier)
+
+log_line(sprintf("  Interactions: %d strong, %d weak, %d predicted (>=%d tools) | %d unique pairs",
+                 sum(inter$tier == "strong"), sum(inter$tier == "weak"),
+                 sum(inter$tier == "predicted"), PREDICTED_MIN_DBS, nrow(inter)))
+if (length(FOCUS_GENES))
+  log_line(sprintf("  Focus genes (bypass pathway gate): %s", paste(FOCUS_GENES, collapse = ", ")))
 
 # ── significant miRNAs — works for 1 or N contrasts ──────────────────────────
 # Strip "DEA_Default_" prefix from contrast names for clean display
@@ -148,27 +246,53 @@ log_line(sprintf("  Significant miRNAs: %d across %d contrast(s): %s",
 build_elements <- function(enrich_df, label, onto_col = NULL) {
   enrich_df <- as.data.frame(enrich_df, stringsAsFactors = FALSE)
 
-  sig_terms <- enrich_df[!is.na(enrich_df$p.adjust) & enrich_df$p.adjust <= PADJ_THRESH, ]
-  sig_terms <- sig_terms[order(sig_terms$p.adjust), ]
-  if (nrow(sig_terms) == 0) {
+  enriched <- enrich_df[!is.na(enrich_df$p.adjust) & enrich_df$p.adjust <= PADJ_THRESH, ]
+  enriched <- enriched[order(enriched$p.adjust), ]
+  focus_extra_desc <- character(0)   # descriptions of focus-only terms added beyond the cap
+  if (nrow(enriched) == 0) {
     log_line(sprintf("  WARN (%s): no significant terms — using top 10.", label))
     sig_terms <- head(enrich_df[order(enrich_df$p.adjust), ], 10)
-  } else if (nrow(sig_terms) > MAX_PATHWAYS) {
-    sig_terms <- sig_terms[seq_len(MAX_PATHWAYS), ]
+  } else {
+    sig_terms <- if (nrow(enriched) > MAX_PATHWAYS) enriched[seq_len(MAX_PATHWAYS), ] else enriched
+    # Focus-aware inclusion: also keep ANY enriched term that contains a FOCUS_GENE, even if it
+    # ranks below the top-MAX_PATHWAYS cap. Lets a spotlighted gene (e.g. ANP32E) bring in its
+    # own biologically-relevant terms (INO80 / SWI-SNF / histone binding) that would otherwise
+    # be hidden under highly-significant but less-relevant terms. These extra terms are wired
+    # ONLY to the focus gene + genes already in the graph (they do NOT import their other member
+    # genes), so they add context without enlarging the rest of the network.
+    if (length(FOCUS_GENES) && "geneID" %in% names(enriched)) {
+      has_focus <- vapply(enriched$geneID, function(g)
+        any(FOCUS_GENES %in% strsplit(g, "/", fixed = TRUE)[[1]]), logical(1))
+      extra <- enriched[has_focus & !(enriched$Description %in% sig_terms$Description), , drop = FALSE]
+      if (nrow(extra) > 0) {
+        focus_extra_desc <- extra$Description
+        sig_terms <- rbind(sig_terms, extra)
+        log_line(sprintf("  %s: +%d focus-gene term(s) kept beyond top-%d (%s)",
+                         label, nrow(extra), MAX_PATHWAYS,
+                         paste(head(extra$Description, 6), collapse = "; ")))
+      }
+    }
   }
-  log_line(sprintf("  %s: %d significant terms", label, nrow(sig_terms)))
+  log_line(sprintf("  %s: %d terms shown", label, nrow(sig_terms)))
 
   te <- expand_terms(sig_terms)
   if (is.null(te) || nrow(te) == 0) return(NULL)
 
-  # miRNA -> gene pairs: strong evidence, gene in an enriched pathway, miRNA significant
-  pairs <- strong[strong$target_symbol %in% unique(te$Gene) &
-                  strong$mirna %in% sig_mirnas_df$miRNA, ]
-  if (nrow(pairs) == 0) return(NULL)
-  tf <- unique(pairs[, c("mirna", "target_symbol")])
-  names(tf) <- c("miRNA", "Gene")
+  # Genes allowed into the view: members of a TOP-cap enriched term PLUS any FOCUS_GENES.
+  # Genes that come ONLY from focus-extra terms are excluded here so those extra terms do not
+  # import their other members — they end up wired only to the focus gene (+ any gene already
+  # in the graph). Focus genes themselves bypass the pathway-membership gate.
+  pathway_genes <- unique(te$Gene[!(te$Pathway %in% focus_extra_desc)])
+  allowed_genes <- union(pathway_genes, FOCUS_GENES)
 
-  # Keep ALL strong-evidence genes in the data; the UI slider hides singletons by default.
+  # miRNA -> gene interactions: any included tier, gene allowed, miRNA significant
+  pairs <- inter[inter$gene %in% allowed_genes &
+                 inter$mirna %in% sig_mirnas_df$miRNA, ]
+  if (nrow(pairs) == 0) return(NULL)
+  tf <- pairs[, c("mirna", "gene", "tier", "evidence")]
+  names(tf)[1:2] <- c("miRNA", "Gene")
+
+  # Total distinct miRNAs per gene (all included tiers); UI slider hides low-degree genes.
   n_mir_per_gene <- table(tf$Gene)
   tf$n_mirnas    <- as.integer(n_mir_per_gene[tf$Gene])
 
@@ -185,6 +309,8 @@ build_elements <- function(enrich_df, label, onto_col = NULL) {
                         sig_mirnas_df$miRNA)
 
   gene_nmir <- setNames(as.integer(n_mir_per_gene[genes]), genes)
+  # Per-gene miRNA counts split by evidence tier (for tooltip + hub call)
+  tier_by_gene <- table(factor(tf$tier, levels = c("strong", "weak", "predicted")), tf$Gene)
   pinfo <- sig_terms[match(paths, sig_terms$Description), ]
   pinfo$neg_log_p <- -log10(pinfo$p.adjust)
   onto <- if (!is.null(onto_col) && onto_col %in% names(pinfo)) as.character(pinfo[[onto_col]])
@@ -228,12 +354,19 @@ build_elements <- function(enrich_df, label, onto_col = NULL) {
 
   for (g in genes) {
     nm  <- gene_nmir[[g]]
-    hub <- nm >= HUB_THRESHOLD
-    tip <- sprintf("<b>%s</b><br>Targeted by %d significant miRNA(s)%s",
-                   g, nm, if (hub) "<br><b>&#9733; Hub gene</b>" else "")
+    ns  <- as.integer(tier_by_gene["strong", g])
+    nw  <- as.integer(tier_by_gene["weak", g])
+    npd <- as.integer(tier_by_gene["predicted", g])
+    hub <- (ns + nw) >= HUB_THRESHOLD          # hub based on VALIDATED evidence only
+    foc <- g %in% FOCUS_GENES
+    tip <- sprintf("<b>%s</b><br>Targeted by %d significant miRNA(s)<br>strong %d &middot; weak %d &middot; predicted %d%s%s",
+                   g, nm, ns, nw, npd,
+                   if (hub) "<br><b>&#9733; Hub gene</b>" else "",
+                   if (foc) "<br><b>&#9733; Focus gene</b>" else "")
     node_list[[length(node_list)+1]] <- list(data = list(
       id = g, label = g, group = "Gene", isHub = as.integer(hub),
-      nmir = nm, size = round(gene_size[[g]], 1), tip = tip))
+      isFocus = as.integer(foc), nmir = nm,
+      size = round(gene_size[[g]], 1), tip = tip))
   }
 
   for (i in seq_along(paths)) {
@@ -255,19 +388,22 @@ build_elements <- function(enrich_df, label, onto_col = NULL) {
 
   # ── edges ──────────────────────────────────────────────────────────────────
   edge_list <- list()
-  ev_counts <- pmax(1L, as.integer(ev_pmids[paste(tf$miRNA, tf$Gene, sep = "||")]))
-  ev_counts[is.na(ev_counts)] <- 1L
+  ev_counts <- pmax(1L, as.integer(tf$evidence)); ev_counts[is.na(ev_counts)] <- 1L
   ew <- rescale_range(log1p(ev_counts), 1.4, 5.5)
+  tier_lab <- c(strong = "validated (strong)", weak = "validated (weak)",
+                predicted = "predicted (consensus)")
 
   for (i in seq_len(nrow(tf))) {
-    m <- tf$miRNA[i]; g <- tf$Gene[i]
+    m <- tf$miRNA[i]; g <- tf$Gene[i]; tr <- tf$tier[i]
     lfc <- lfc_map[[m]]
     dir <- if (is.na(lfc)) "na" else if (lfc > 0) "up" else "down"
-    tip <- sprintf("<b>%s &rarr; %s</b><br>miRNA: %s<br>Evidence: %d PMID(s)",
-                   m, g, if (identical(dir,"up")) "UP" else "DOWN", ev_counts[i])
+    ev_unit <- if (identical(tr, "predicted")) sprintf("%d prediction tool(s)", ev_counts[i])
+               else sprintf("%d PMID(s)", ev_counts[i])
+    tip <- sprintf("<b>%s &rarr; %s</b><br>miRNA: %s<br>Evidence: %s<br>Tier: %s",
+                   m, g, if (identical(dir,"up")) "UP" else "DOWN", ev_unit, tier_lab[[tr]])
     edge_list[[length(edge_list)+1]] <- list(data = list(
       id = sprintf("mg%d", i), source = m, target = g,
-      etype = "mg", dir = dir, w = round(ew[i], 2), tip = tip))
+      etype = "mg", dir = dir, tier = tr, w = round(ew[i], 2), tip = tip))
   }
 
   gp <- unique(te[, c("Gene", "Pathway")])
@@ -397,6 +533,7 @@ write_dashboard <- function(payload, out_file, page_title, pathway_label, is_go 
   .sw-hex{ width:14px; height:14px; background:var(--path); flex-shrink:0;
            clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); }
   .sw-line{ width:20px; height:3px; border-radius:2px; flex-shrink:0; }
+  .sw-dash{ width:20px; height:0; border-top:2px dashed #9aa3ad; flex-shrink:0; }
   .muted{ color:#8a94a0; font-size:10px; margin-top:4px; }
 
   #tooltip{ position:absolute; z-index:40; pointer-events:none; display:none; max-width:280px;
@@ -418,7 +555,7 @@ write_dashboard <- function(payload, out_file, page_title, pathway_label, is_go 
 
   <div id="panel">
     <div class="scroll">
-      <input id="search" class="search" type="text" placeholder="Search miRNA / gene / pathway...">
+      <input id="search" class="search" type="text" placeholder="Add by name (Enter): miRNA / gene / pathway…">
       <div class="toolbar">
         <select id="layout-sel" title="Layout">
           <option value="fcose">Layout: organic (fCoSE)</option>
@@ -455,6 +592,16 @@ write_dashboard <- function(payload, out_file, page_title, pathway_label, is_go 
 
       ', contrast_filter_html, '
       <div class="filter-group">
+        <div class="filter-header"><span>Evidence tier</span>
+          <span><button class="btn-mini" data-all-tier="1">All</button>
+                <button class="btn-mini" data-all-tier="0">None</button></span></div>
+        <div class="checkbox-list">
+          <label><input type="checkbox" class="chk-tier" data-tier="strong" checked> Validated &mdash; strong</label>
+          <label><input type="checkbox" class="chk-tier" data-tier="weak"> Validated &mdash; weak</label>
+          <label><input type="checkbox" class="chk-tier" data-tier="predicted"> Predicted (&#8805;', PREDICTED_MIN_DBS, ' tools)</label>
+        </div>
+      </div>
+      <div class="filter-group">
         <div class="filter-header"><span style="color:var(--mir-up)">miRNAs</span>
           <span><button class="btn-mini" data-all="miRNA" data-on="1">All</button>
                 <button class="btn-mini" data-all="miRNA" data-on="0">None</button></span></div>
@@ -482,7 +629,11 @@ write_dashboard <- function(payload, out_file, page_title, pathway_label, is_go 
         <div class="legend-row"><span class="sw-hex"></span> ', pathway_label, ' term</div>
         <div class="legend-row"><span class="sw-line" style="background:var(--mir-up)"></span> Edge: miRNA UP &rarr; gene</div>
         <div class="legend-row"><span class="sw-line" style="background:var(--mir-down)"></span> Edge: miRNA DOWN &rarr; gene</div>
+        <div class="legend-row"><span class="sw-line" style="background:#9aa3ad;height:3px"></span> Validated strong (thick)</div>
+        <div class="legend-row"><span class="sw-line" style="background:#9aa3ad;height:1px"></span> Validated weak (thin)</div>
+        <div class="legend-row"><span class="sw-dash"></span> Predicted (dashed, consensus)</div>
         <div class="legend-row"><span class="sw" style="background:transparent;border:2px solid var(--gold)"></span> Top 25% most significant</div>
+        <div class="legend-row"><span class="sw" style="background:var(--gene);border-radius:3px;border:2px solid #111"></span> Focus gene (always shown)</div>
 ', contrast_legend_html, '
         <div class="muted">Node size = significance &middot; edge width = evidence (PMIDs) &middot; click a node to focus its neighborhood &middot; hover for details</div>
       </div>
@@ -515,6 +666,8 @@ const stylesheet = [
   { selector: "node[group=\'Gene\']", style:{ "shape":"ellipse", "background-color":"#4DBBD5" } },
   { selector: "node[group=\'Gene\'][isHub=1]", style:{ "background-color":"#FF7F00",
       "font-size":10, "border-color":"#b35a00" } },
+  { selector: "node[group=\'Gene\'][isFocus=1]", style:{ "shape":"round-rectangle",
+      "border-width":3.5, "border-color":"#111", "font-size":11, "font-weight":"bold" } },
 
   { selector: "node[group=\'Pathway\']", style:{ "shape":"hexagon", "background-color":"#7B2D8B",
       "color":"#ffffff", "text-outline-color":"#4a1a55", "text-outline-width":2, "font-size":10,
@@ -529,6 +682,8 @@ const stylesheet = [
       "line-color":"#c2c8cf", "target-arrow-shape":"none", "opacity":0.55 } },
   { selector: "edge[etype=\'mg\'][dir=\'up\']",   style:{ "line-color":"#d62728", "opacity":0.6 } },
   { selector: "edge[etype=\'mg\'][dir=\'down\']", style:{ "line-color":"#1f77b4", "opacity":0.6 } },
+  { selector: "edge[etype=\'mg\'][tier=\'weak\']", style:{ "opacity":0.4, "line-style":"solid" } },
+  { selector: "edge[etype=\'mg\'][tier=\'predicted\']", style:{ "line-style":"dashed", "opacity":0.38 } },
   { selector: "edge[etype=\'gp\']", style:{ "line-color":"#b9c0c8", "line-style":"dashed", "width":1, "opacity":0.4 } },
 
   { selector: ".faded", style:{ "opacity":0.07, "text-opacity":0 } },
@@ -551,19 +706,27 @@ function layoutOpts(name){
     return { name:"cose", animate:false, idealEdgeLength: FORCES.linkDist,
              nodeRepulsion: FORCES.repulsion * 100, nodeOverlap: 12,
              gravity: FORCES.gravity, numIter:1500 };
-  return { name:"fcose", quality:"proof", animate:false, randomize:true, packComponents:true,
+  // "default" quality (vs "proof") and fewer iterations keep the organic layout responsive
+  // even on large visible subgraphs; it always runs on the VISIBLE elements only.
+  return { name:"fcose", quality:"default", animate:false, randomize:true, packComponents:true,
            nodeSeparation: 30 + FORCES.repulsion/120,
            nodeRepulsion: () => FORCES.repulsion,
            idealEdgeLength: e => e.data("etype")==="gp" ? FORCES.linkDist*1.5 : FORCES.linkDist,
            edgeElasticity: 0.4, gravity: FORCES.gravity, gravityRange: 4.5,
-           numIter: 3000, tile: true, tilingPaddingVertical: 18, tilingPaddingHorizontal: 18 };
+           numIter: 1500, tile: true, tilingPaddingVertical: 18, tilingPaddingHorizontal: 18 };
 }
 
+// Running the organic (fcose) layout on every node up front freezes the tab on large
+// graphs (all tiers + predicted can be thousands of nodes). For big graphs we seed all
+// positions with the O(n) concentric (rings) layout — instant, and it positions hidden
+// nodes too so toggling tiers later reveals already-placed nodes. The user can switch to
+// fcose, which re-runs only on the (smaller) VISIBLE subset.
+const INITIAL_LAYOUT = DATA.nodes.length > 500 ? "concentric" : "fcose";
 const cy = cytoscape({
   container: document.getElementById("cy"),
   elements: [...DATA.nodes, ...DATA.edges],
   style: stylesheet,
-  layout: layoutOpts("fcose"),
+  layout: layoutOpts(INITIAL_LAYOUT),
   wheelSensitivity: 0.22,
   minZoom: 0.08, maxZoom: 4
 });
@@ -588,27 +751,63 @@ function buildList(group){
 
 // ── filtering (visibility only — no re-layout, edges auto-hide with their nodes) ──
 const checkedIds = () => new Set([...document.querySelectorAll(".chk:checked")].map(c=>c.dataset.id));
+// Edge-driven filtering: an miRNA->gene edge shows only if both endpoints are checked AND
+// its evidence tier is active; genes need >= minMir visible miRNA edges; miRNAs/pathways
+// survive only if they still have a visible neighbour. No re-layout — visibility only.
 function applyFilters(){
   const minMir = +document.getElementById("deg-slider").value;
   const checked = checkedIds();
-  // Contrast filter (only active when multiple DEA files were loaded)
   const hiddenContrasts = new Set(
     [...document.querySelectorAll(".chk-contrast:not(:checked)")].map(c => c.dataset.contrast)
   );
+  const activeTiers = new Set(
+    [...document.querySelectorAll(".chk-tier:checked")].map(c => c.dataset.tier)
+  );
   cy.batch(() => {
+    // 1. node eligibility from group checkboxes (+ contrast filter for miRNAs)
     cy.nodes().forEach(n => {
-      const g = n.data("group");
-      let vis = checked.has(n.id());
-      if (vis && g==="Gene"  && n.data("nmir") < minMir) vis = false;
-      if (vis && g==="miRNA" && hiddenContrasts.has(n.data("contrast"))) vis = false;
+      let elig = checked.has(n.id());
+      if (elig && n.data("group")==="miRNA" && hiddenContrasts.has(n.data("contrast"))) elig = false;
+      n.scratch("_elig", elig);
+    });
+    // 2. miRNA->gene edges: endpoints eligible + tier active; tally per-gene degree
+    const geneDeg = {};
+    cy.edges("[etype=\'mg\']").forEach(e => {
+      const vis = e.source().scratch("_elig") && e.target().scratch("_elig")
+                  && activeTiers.has(e.data("tier"));
+      e.scratch("_vis", vis);
+      if (vis){ const gid = e.target().id(); geneDeg[gid] = (geneDeg[gid]||0) + 1; }
+    });
+    // 3. genes: eligible + enough distinct miRNAs (visible mg edges)
+    cy.nodes("[group=\'Gene\']").forEach(n => {
+      const vis = n.scratch("_elig") && (geneDeg[n.id()]||0) >= minMir;
       n.style("display", vis ? "element" : "none");
     });
-    // prune now-orphaned pathways and miRNAs (no visible gene neighbour)
-    cy.nodes("[group=\'Pathway\'], [group=\'miRNA\']").forEach(n => {
-      if (n.style("display")==="none") return;
-      const liveGene = n.connectedEdges().connectedNodes("[group=\'Gene\']")
-                        .some(g => g.style("display")!=="none");
-      if (!liveGene) n.style("display","none");
+    // 4. miRNAs: eligible + >= 1 visible mg edge to a visible gene
+    cy.nodes("[group=\'miRNA\']").forEach(n => {
+      let vis = false;
+      if (n.scratch("_elig"))
+        vis = n.connectedEdges("[etype=\'mg\']").some(e =>
+                e.scratch("_vis") && e.target().style("display")!=="none");
+      n.style("display", vis ? "element" : "none");
+    });
+    // 5. pathways: eligible + >= 1 visible gene member
+    cy.nodes("[group=\'Pathway\']").forEach(n => {
+      let vis = false;
+      if (n.scratch("_elig"))
+        vis = n.connectedEdges("[etype=\'gp\']").some(e =>
+                e.source().style("display")!=="none");
+      n.style("display", vis ? "element" : "none");
+    });
+    // 6. edges follow their endpoints (mg edges also respect tier via _vis)
+    cy.edges().forEach(e => {
+      let vis;
+      if (e.data("etype")==="mg")
+        vis = e.scratch("_vis") && e.source().style("display")!=="none"
+              && e.target().style("display")!=="none";
+      else
+        vis = e.source().style("display")!=="none" && e.target().style("display")!=="none";
+      e.style("display", vis ? "element" : "none");
     });
   });
   updateStats();
@@ -664,6 +863,13 @@ document.querySelectorAll("[data-all]").forEach(b => b.addEventListener("click",
   document.querySelectorAll("#list-"+g+" .chk").forEach(c => c.checked = on);
   applyFilters();
 }));
+// Evidence-tier checkboxes (strong / weak / predicted)
+document.querySelectorAll(".chk-tier").forEach(c => c.addEventListener("change", applyFilters));
+document.querySelectorAll("[data-all-tier]").forEach(b => b.addEventListener("click", () => {
+  const on = b.dataset.allTier === "1";
+  document.querySelectorAll(".chk-tier").forEach(c => c.checked = on);
+  applyFilters();
+}));
 const degSlider = document.getElementById("deg-slider");
 degSlider.addEventListener("input", () => {
   document.getElementById("deg-val").textContent = degSlider.value;
@@ -713,19 +919,53 @@ document.getElementById("layout-sel").addEventListener("change", e => runLayout(
 document.getElementById("btn-relayout").addEventListener("click",
   () => runLayout(document.getElementById("layout-sel").value));
 
+// Search is ADDITIVE: pressing Enter ticks the matched node checkbox (and its neighbour
+// nodes), enables whatever evidence tier(s) its edges need, relaxes the degree gate if it
+// would hide the match, then reveals + zooms to it. Searching again keeps the previous
+// matches on screen, so you can build up a custom set of genes / miRNAs / pathways.
 const search = document.getElementById("search");
 search.addEventListener("keydown", e => {
   if (e.key !== "Enter") return;
-  const q = search.value.trim().toLowerCase(); if (!q) { clearFocus(); return; }
-  const hit = cy.nodes().filter(n => n.style("display")!=="none"
-                && n.data("label").toLowerCase().includes(q));
-  if (hit.length === 0) return;
+  const q = search.value.trim().toLowerCase();
+  if (!q) { clearFocus(); return; }
+  // Match across ALL nodes — even ones currently hidden by the filters.
+  const hits = cy.nodes().filter(n => n.data("label").toLowerCase().includes(q));
+  if (hits.length === 0) return;
+
+  // 1. tick the matched nodes + their immediate neighbours so edges have both endpoints
+  const need = hits.union(hits.connectedNodes());
+  const wanted = new Set(need.map(n => n.id()));
+  document.querySelectorAll(".chk").forEach(cb => { if (wanted.has(cb.dataset.id)) cb.checked = true; });
+
+  // 2. enable the evidence tier(s) present on the matched node edges
+  const tiers = new Set();
+  hits.connectedEdges("[etype=\'mg\']").forEach(ed => tiers.add(ed.data("tier")));
+  document.querySelectorAll(".chk-tier").forEach(c => { if (tiers.has(c.dataset.tier)) c.checked = true; });
+
+  // 3. if a matched gene would be hidden by the "min miRNAs per gene" gate, relax it
+  const slider = document.getElementById("deg-slider");
+  let minDeg = Infinity;
+  hits.filter("[group=\'Gene\']").forEach(g => {
+    const d = g.connectedEdges("[etype=\'mg\']").filter(ed => tiers.has(ed.data("tier"))).length;
+    if (d < minDeg) minDeg = d;
+  });
+  if (minDeg !== Infinity && minDeg < +slider.value) {
+    slider.value = Math.max(1, minDeg);
+    document.getElementById("deg-val").textContent = slider.value;
+  }
+
+  applyFilters();
+
+  // 4. highlight + zoom to the now-visible matches
   clearFocus();
+  const visHits = hits.filter(n => n.style("display")!=="none");
+  if (visHits.length === 0) return;
   cy.elements().addClass("faded");
-  hit.removeClass("faded").addClass("hl-node");
-  hit.connectedEdges().removeClass("faded").addClass("hl-edge");
-  hit.connectedEdges().connectedNodes().removeClass("faded");
-  cy.animate({ fit:{ eles:hit.closedNeighborhood(), padding:80 } }, { duration:400 });
+  visHits.removeClass("faded").addClass("hl-node");
+  visHits.connectedEdges(":visible").removeClass("faded").addClass("hl-edge");
+  visHits.connectedEdges(":visible").connectedNodes().removeClass("faded");
+  cy.animate({ fit:{ eles: visHits.closedNeighborhood().filter(":visible"), padding:80 } },
+             { duration:400 });
 });
 
 // ── multi-contrast wiring (no-op when nDea === 1) ────────────────────────────
@@ -750,6 +990,7 @@ if (CFG.nDea > 1) {
 }
 
 // ── init ─────────────────────────────────────────────────────────────────────
+document.getElementById("layout-sel").value = INITIAL_LAYOUT;   // keep the dropdown in sync
 cy.ready(() => { applyFilters(); cy.fit(cy.elements(":visible"), 40); updateStats(); });
 </script>
 </body>

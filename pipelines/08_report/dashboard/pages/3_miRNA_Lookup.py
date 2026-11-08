@@ -116,3 +116,58 @@ else:
                        ibd.to_csv(index=False).encode(),
                        file_name=f"{mirna}_IBD_profile.csv", mime="text/csv",
                        key="dl_mirna_ibd")
+
+st.divider()
+
+# ── Section 3: target genes (validated + predicted) ───────────────────────────
+st.markdown("### Target genes — validated & predicted")
+st.caption("miRNA→gene pairs from multiMiR for this miRNA, pooled from each dataset's "
+           "DE-significant target tables. **Validated** = experimental evidence in curated "
+           "databases (miRTarBase, etc.); **Predicted** = prediction algorithms (elmmo, "
+           "PITA, …). The **IBD_gene** column flags targets that are known IBD genes "
+           "(OpenTargets). Note: a relationship the source paper validated experimentally "
+           "may still appear only under *Predicted* here until curated databases include it.")
+
+tp = D.mirna_target_profile(mirna)
+val_t, pred_t = tp["validated"], tp["predicted"]
+
+if (val_t is None or val_t.empty) and (pred_t is None or pred_t.empty):
+    st.info("No target table entries for this miRNA. It may not be DE-significant in any "
+            "dataset (targets are only queried for the DE-significant set).")
+else:
+    n_val = val_t["target_symbol"].nunique() if not val_t.empty else 0
+    n_pred = pred_t["target_symbol"].nunique() if not pred_t.empty else 0
+    n_ibd = sum(df[df["IBD_gene"]]["target_symbol"].nunique()
+                for df in (val_t, pred_t) if not df.empty)
+    mc = st.columns(3)
+    mc[0].metric("Validated genes (unique)", n_val)
+    mc[1].metric("Predicted genes (unique)", n_pred)
+    mc[2].metric("…that are IBD genes", n_ibd)
+
+    gene_filter = st.text_input("Filter by gene (optional)", "",
+                                placeholder="e.g. CADM1").strip().upper()
+
+    def _show_targets(df):
+        if df is None or df.empty:
+            st.info("No records.")
+            return
+        view = df.copy()
+        if gene_filter:
+            view = view[view["target_symbol"].astype(str).str.upper()
+                        .str.contains(gene_filter, na=False)]
+        if view.empty:
+            st.info(f"No gene matches “{gene_filter}”.")
+            return
+        # IBD genes first, then alphabetical by gene.
+        view = (view.sort_values(["IBD_gene", "target_symbol"], ascending=[False, True])
+                .reset_index(drop=True))
+        view["dataset"] = view["dataset"].map(D.ds_label)
+        D.df_with_copy(view, use_container_width=True, hide_index=True)
+
+    t_val, t_pred = st.tabs(
+        [f"Validated ({0 if val_t is None or val_t.empty else len(val_t)})",
+         f"Predicted ({0 if pred_t is None or pred_t.empty else len(pred_t)})"])
+    with t_val:
+        _show_targets(val_t)
+    with t_pred:
+        _show_targets(pred_t)

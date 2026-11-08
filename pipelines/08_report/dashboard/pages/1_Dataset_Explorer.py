@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import streamlit.components.v1 as components
 
 import data as D
 
@@ -37,13 +38,14 @@ if d.get("url"):
 # The Clinical tab only exists for datasets with treatment-response (responder vs
 # non-responder) data, so it's inserted conditionally before Reports.
 clin = D.clinical_results(odir)
-tab_labels = ["Samples & QC", "Differential expression", "Enrichment", "IBD overlap"]
+tab_labels = ["Samples & QC", "Differential expression", "Enrichment", "Targets", "IBD overlap"]
 if clin:
     tab_labels.append("Clinical (treatment response)")
-tab_labels.append("Reports")
+tab_labels += ["Networks", "Reports"]   # Networks & Reports are always the last two
 tabs = st.tabs(tab_labels)
-tab_qc, tab_dea, tab_enrich, tab_ibd = tabs[0], tabs[1], tabs[2], tabs[3]
-tab_clin = tabs[4] if clin else None
+tab_qc, tab_dea, tab_enrich, tab_targets, tab_ibd = tabs[0], tabs[1], tabs[2], tabs[3], tabs[4]
+tab_clin = tabs[5] if clin else None
+tab_networks = tabs[-2]
 tab_reports = tabs[-1]
 
 # ── Samples & QC ──────────────────────────────────────────────────────────────
@@ -158,6 +160,83 @@ with tab_enrich:
         else:
             ecols[1].info(f"No {kind} enrichment table.")
         st.divider()
+
+# ── Targets (validated + predicted miRNA→gene pairs) ──────────────────────────
+with tab_targets:
+    tt = D.dataset_targets(odir)
+    val_all = tt.get("validated", pd.DataFrame())
+    pred_all = tt.get("predicted", pd.DataFrame())
+    if (val_all is None or val_all.empty) and (pred_all is None or pred_all.empty):
+        st.info("No target tables for this dataset. Run `06_targets_enrich/"
+                "16_multimir_targets.R` (or `alt1_derive_targets_from_baseline.R`) first.")
+    else:
+        st.caption("miRNA→gene targets for this dataset's DE-significant miRNAs. "
+                   "**Validated** = curated experimental evidence; **Predicted** = "
+                   "algorithms (elmmo, PITA, …). **IBD_gene** flags known IBD genes "
+                   "(OpenTargets). Predicted tables are large — use the per-miRNA "
+                   "drill-down and the 'IBD genes only' filter below.")
+
+        def _per_mirna(df):
+            if df is None or df.empty or "mirna" not in df.columns:
+                return pd.Series(dtype=int), pd.Series(dtype=int)
+            tot = df.groupby("mirna")["target_symbol"].nunique()
+            ibd = (df[df["IBD_gene"]].groupby("mirna")["target_symbol"].nunique()
+                   if "IBD_gene" in df.columns else pd.Series(dtype=int))
+            return tot, ibd
+
+        vt, vi = _per_mirna(val_all)
+        pt, pi = _per_mirna(pred_all)
+        mirnas = sorted(set(vt.index) | set(pt.index))
+        summary = (pd.DataFrame({
+            "miRNA": mirnas,
+            "validated_genes": [int(vt.get(m, 0)) for m in mirnas],
+            "predicted_genes": [int(pt.get(m, 0)) for m in mirnas],
+            "IBD_validated": [int(vi.get(m, 0)) for m in mirnas],
+            "IBD_predicted": [int(pi.get(m, 0)) for m in mirnas],
+        }).sort_values(["IBD_validated", "IBD_predicted", "predicted_genes"],
+                       ascending=False).reset_index(drop=True))
+
+        st.markdown("**Per-miRNA summary**")
+        D.df_with_copy(summary, use_container_width=True, hide_index=True)
+
+        st.divider()
+        st.markdown("**Drill-down** — one miRNA at a time")
+        dc = st.columns([2, 1, 2])
+        sel_mir = dc[0].selectbox("miRNA", mirnas, key=f"tgt_mir_{ds_id}")
+        ibd_only = dc[1].checkbox("IBD genes only", value=True, key=f"tgt_ibd_{ds_id}")
+        gene_q = dc[2].text_input("Filter by gene", "", placeholder="e.g. CADM1",
+                                  key=f"tgt_gene_{ds_id}").strip().upper()
+
+        def _drill(df, kind):
+            if df is None or df.empty or "mirna" not in df.columns:
+                st.info("No records."); return
+            sub = df[df["mirna"].astype(str) == sel_mir].copy()
+            if sub.empty:
+                st.info(f"No {kind} targets for {sel_mir}."); return
+            if ibd_only and "IBD_gene" in sub.columns:
+                sub = sub[sub["IBD_gene"]]
+            if gene_q:
+                sub = sub[sub["target_symbol"].astype(str).str.upper()
+                          .str.contains(gene_q, na=False)]
+            if sub.empty:
+                st.info("No targets match the current filters."); return
+            # n_db = how many distinct databases support each gene (a confidence signal).
+            if "database" in sub.columns:
+                sub["n_db"] = sub.groupby("target_symbol")["database"].transform("nunique")
+            order = ["target_symbol", "n_db", "database", "score_or_rank", "IBD_gene",
+                     "support_type", "experiment", "pmid"]
+            sub = sub[[c for c in order if c in sub.columns]]
+            sort_cols = [c for c in ["IBD_gene", "n_db", "target_symbol"] if c in sub.columns]
+            sub = sub.sort_values(sort_cols, ascending=[False] * (len(sort_cols) - 1) + [True]
+                                  if len(sort_cols) > 1 else [True]).reset_index(drop=True)
+            st.caption(f"{sub['target_symbol'].nunique()} genes · {len(sub)} rows")
+            D.df_with_copy(sub, use_container_width=True, hide_index=True)
+
+        t_v, t_p = st.tabs(["Validated", "Predicted"])
+        with t_v:
+            _drill(val_all, "validated")
+        with t_p:
+            _drill(pred_all, "predicted")
 
 # ── IBD overlap ───────────────────────────────────────────────────────────────
 with tab_ibd:
@@ -331,6 +410,32 @@ if clin:
         _gallery("ROC curves — UC vs HC", clin.get("roc_uchc_pngs", []))
         _gallery("Violin plots (HC / NR / R)", clin.get("violin_pngs", []))
 
+# ── Networks (GO / KEGG interactive Cytoscape, embedded) ──────────────────────
+with tab_networks:
+    nets = D.network_html(odir)   # {"GO": path, "KEGG": path}
+    if not nets:
+        st.info("No interactive network dashboards found. Run "
+                "`07_networks_clin/19_interactive_network.R` for this dataset.")
+    else:
+        st.caption("Tripartite **miRNA → gene → pathway/GO** network (Cytoscape.js). "
+                   "Drag nodes, zoom and hover for details. Built from this dataset's "
+                   "DE-significant miRNAs and their enriched terms.")
+        kinds = list(nets.keys())
+        kind = (st.radio("Network", kinds, horizontal=True, key=f"net_kind_{ds_id}")
+                if len(kinds) > 1 else kinds[0])
+        path = nets[kind]
+        try:
+            components.html(path.read_text(encoding="utf-8"), height=720, scrolling=True)
+        except Exception as e:
+            st.warning(f"Could not embed the {kind} network: {e}")
+        oc, dc = st.columns(2)
+        if oc.button("🌐 Open full-screen (OS browser)", use_container_width=True,
+                     key=f"net_open_{ds_id}_{kind}"):
+            D.open_in_os(path)
+        dc.download_button("⬇️ Download HTML", path.read_bytes(),
+                           file_name=f"{ds_id}_network_{kind}.html", mime="text/html",
+                           use_container_width=True, key=f"net_dl_{ds_id}_{kind}")
+
 # ── Reports ───────────────────────────────────────────────────────────────────
 with tab_reports:
     # Each report: open it in the OS browser (left) or download it (right).
@@ -355,15 +460,5 @@ with tab_reports:
                                mime="text/html", key=f"dl_rep_{i}",
                                use_container_width=True)
 
-    nets = D.network_html(odir)
-    if nets:
-        st.markdown("**Interactive network dashboards**")
-        for kind, path in nets.items():
-            nc, oc, dc = st.columns([2, 1, 1])
-            nc.markdown(f"**🕸️ {kind} network**")
-            if oc.button("🌐 Open", key=f"open_net_{kind}", use_container_width=True):
-                D.open_in_os(path)
-            dc.download_button("⬇️ Download", path.read_bytes(),
-                               file_name=f"{ds_id}_network_{kind}.html",
-                               mime="text/html", key=f"dl_net_{kind}",
-                               use_container_width=True)
+    st.caption("🕸️ Interactive GO/KEGG networks are now in the **Networks** tab "
+               "(viewable in-app).")
